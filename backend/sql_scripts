@@ -1,0 +1,108 @@
+CREATE TABLE users (
+  id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+
+  role TINYINT UNSIGNED NOT NULL COMMENT '1=super_admin, 2=admin, 3=customer',
+
+  name VARCHAR(120) NOT NULL,
+  phone_no VARCHAR(20) NOT NULL UNIQUE,        -- login for staff
+  telephone VARCHAR(20) NULL,
+  email VARCHAR(190) NULL UNIQUE,
+  loyalty_number VARCHAR(50) NULL UNIQUE,
+  address TEXT NULL,
+
+  password_hash VARCHAR(255) NULL,             -- NULL for customers
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+
+  created_by BIGINT UNSIGNED NULL,             -- user id who created this record
+
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+  INDEX idx_users_phone (phone_no),
+  INDEX idx_users_role (role),
+  INDEX idx_users_created_by (created_by)
+);
+
+
+CREATE TABLE refresh_tokens (
+  id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  user_id BIGINT UNSIGNED NOT NULL,
+
+  token_hash CHAR(64) NOT NULL,
+  issued_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  expires_at DATETIME NOT NULL,
+  revoked_at DATETIME NULL,
+
+  user_agent VARCHAR(255) NULL,
+  ip VARCHAR(45) NULL,
+
+  INDEX idx_rt_user (user_id),
+  INDEX idx_rt_hash (token_hash),
+  INDEX idx_rt_expires (expires_at)
+);
+
+CREATE TABLE bookings (
+  id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+
+  booking_date DATE NOT NULL,
+  start_time TIME NOT NULL,
+  end_time TIME NOT NULL,
+
+  customer_id BIGINT UNSIGNED NOT NULL,     -- users.id where role=4
+
+  service_name VARCHAR(150) NOT NULL,
+  service_amount DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  note TEXT NULL,
+
+  status VARCHAR(30) NOT NULL DEFAULT 'pending'
+    COMMENT 'pending, confirmed, completed, cancelled',
+
+  payment_status VARCHAR(30) NOT NULL DEFAULT 'unpaid'
+    COMMENT 'unpaid, partial, paid',
+
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,   -- soft delete flag
+
+  created_by BIGINT UNSIGNED NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+  INDEX idx_booking_date (booking_date),
+  INDEX idx_booking_customer (customer_id),
+  INDEX idx_booking_status (status)
+
+);
+
+
+CREATE TABLE booking_staff (
+  booking_id BIGINT UNSIGNED NOT NULL,
+  staff_id BIGINT UNSIGNED NOT NULL,      -- users.id where role=3
+
+  assigned_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  assigned_by BIGINT UNSIGNED NULL,       -- users.id who assigned
+
+  PRIMARY KEY (booking_id, staff_id),
+
+  INDEX idx_bs_staff (staff_id),
+  INDEX idx_bs_assigned_by (assigned_by)
+);
+
+CREATE TABLE payments (
+  id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+
+  booking_id BIGINT UNSIGNED NOT NULL,
+
+  amount DECIMAL(12,2) NOT NULL,
+  method VARCHAR(40) NULL,
+  reference_no VARCHAR(100) NULL,
+
+  paid_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  note TEXT NULL,
+
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,   -- soft delete flag
+
+  created_by BIGINT UNSIGNED NULL,
+
+  INDEX idx_pay_booking (booking_id),
+  INDEX idx_pay_paid_at (paid_at),
+  INDEX idx_pay_active (is_active)
+);
