@@ -14,9 +14,17 @@ export function formatCurrency(amount: number): string {
   }).format(amount);
 }
 
+// utils.ts
 export function formatDate(date: string | Date): string {
-  return format(new Date(date), 'dd/MM/yyyy');
+  const parsedDate = new Date(date);
+  
+  if (isNaN(parsedDate.getTime())) {
+    return "Invalid Date"; // Return a fallback message or empty string
+  }
+  
+  return parsedDate.toLocaleDateString();
 }
+
 
 export function formatDateTime(date: string | Date): string {
   return format(new Date(date), 'dd/MM/yyyy HH:mm');

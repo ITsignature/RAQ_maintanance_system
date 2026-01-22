@@ -15,6 +15,7 @@ const createPaymentSchema = z.object({
   note: z.string().optional().nullable(),
 });
 
+
 // Add payment
 router.post(
   "/",
@@ -54,6 +55,53 @@ router.post(
   })
 );
 
+
+// GET payments (admin/super only)
+// Examples:
+//  GET /api/payments
+//  GET /api/payments?booking_id=1
+//  GET /api/payments?include_inactive=true
+router.get(
+  "/",
+  requireAuth,
+  requireRole(1, 2),
+  asyncHandler(async (req, res) => {
+    const bookingId = req.query.booking_id ? Number(req.query.booking_id) : null;
+    const includeInactive = String(req.query.include_inactive || "false") === "true";
+
+    if (req.query.booking_id && Number.isNaN(bookingId)) {
+      return res.status(400).json({ message: "booking_id must be a number" });
+    }
+
+    let sql = `
+      SELECT
+        p.id, p.booking_id, p.amount, p.method, p.reference_no, p.paid_at, p.note,
+        p.is_active, p.created_by,
+        b.service_name, b.service_amount, b.payment_status
+      FROM payments p
+      JOIN bookings b ON b.id = p.booking_id
+      WHERE 1=1
+    `;
+    const params = [];
+
+    if (!includeInactive) {
+      sql += ` AND p.is_active = TRUE`;
+    }
+
+    if (bookingId) {
+      sql += ` AND p.booking_id = ?`;
+      params.push(bookingId);
+    }
+
+    sql += ` ORDER BY p.paid_at DESC, p.id DESC`;
+
+    const [rows] = await pool.query(sql, params);
+    res.json(rows);
+  })
+);
+
+
+
 // Soft delete payment
 router.delete(
   "/:id",
@@ -73,4 +121,114 @@ router.delete(
   })
 );
 
+
+// Add this optimized endpoint to your bookings routes file
+// This reduces API calls by joining all necessary data in one query
+
+// Add this to your payments routes file (payments.js)
+
+// GET /api/payments/overview
+// Returns all payment transactions with customer and booking info
+router.get(
+  "/overview",
+  requireAuth,
+  requireRole(1, 2, 3),
+  asyncHandler(async (req, res) => {
+    const { page = 1, date, method } = req.query;
+    const perPage = 50;
+    const offset = (page - 1) * perPage;
+
+    let whereClause = 'WHERE p.is_active = TRUE';
+    const params = [];
+
+    // Apply date filter (filter by payment date, not booking date)
+    if (date) {
+      whereClause += ` AND DATE(p.paid_at) = ?`;
+      params.push(date);
+    }
+
+    // Apply payment method filter
+    if (method && method !== 'all') {
+      whereClause += ` AND p.method = ?`;
+      params.push(method);
+    }
+
+    // Main query - get all payments with customer and booking info
+    const [payments] = await pool.query(
+      `SELECT 
+        p.id,
+        p.booking_id,
+        p.amount,
+        p.method,
+        p.reference_no,
+        p.paid_at,
+        p.note,
+        p.is_active,
+        p.created_by,
+        b.service_name,
+        b.service_amount,
+        b.payment_status,
+        b.booking_date,
+        u.name as customer_name,
+        u.phone_no as customer_phone
+       FROM payments p
+       JOIN bookings b ON b.id = p.booking_id
+       JOIN users u ON u.id = b.customer_id
+       ${whereClause}
+       ORDER BY p.paid_at DESC, p.id DESC
+       LIMIT ? OFFSET ?`,
+      [...params, perPage, offset]
+    );
+
+    // Get total count for pagination
+    const [[{ total }]] = await pool.query(
+      `SELECT COUNT(*) as total
+       FROM payments p
+       JOIN bookings b ON b.id = p.booking_id
+       ${whereClause}`,
+      params
+    );
+
+    // Calculate statistics for filtered data
+    const [[stats]] = await pool.query(
+      `SELECT 
+        COUNT(*) as total_payments,
+        COALESCE(SUM(p.amount), 0) as total_amount
+       FROM payments p
+       JOIN bookings b ON b.id = p.booking_id
+       ${whereClause}`,
+      params
+    );
+
+    // Calculate today's payments (regardless of filters)
+    const today = new Date().toISOString().split('T')[0];
+    const [[todayStats]] = await pool.query(
+      `SELECT 
+        COUNT(*) as today_payments,
+        COALESCE(SUM(p.amount), 0) as today_amount
+       FROM payments p
+       WHERE p.is_active = TRUE
+         AND DATE(p.paid_at) = ?`,
+      [today]
+    );
+
+    const statistics = {
+      totalPayments: parseInt(stats?.total_payments || 0),
+      totalAmount: parseFloat(stats?.total_amount || 0),
+      todayPayments: parseInt(todayStats?.today_payments || 0),
+      todayAmount: parseFloat(todayStats?.today_amount || 0),
+    };
+
+    res.json({
+      payments,
+      statistics,
+      pagination: {
+        total: parseInt(total),
+        page: parseInt(page),
+        totalPages: Math.ceil(total / perPage),
+        perPage,
+      },
+    });
+  })
+);
 module.exports = router;

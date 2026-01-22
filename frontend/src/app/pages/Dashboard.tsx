@@ -129,7 +129,7 @@ export function Dashboard() {
       </motion.div>
 
       {/* Alerts */}
-      {overdueBookings.length > 0 && (
+      {/* {overdueBookings.length > 0 && (
         <motion.div variants={itemVariants}>
           <Card className="border-red-200 dark:border-red-900 bg-gradient-to-r from-red-50 to-transparent dark:from-red-950 dark:to-transparent">
             <CardHeader>
@@ -165,7 +165,7 @@ export function Dashboard() {
             </CardContent>
           </Card>
         </motion.div>
-      )}
+      )} */}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Today's Schedule */}

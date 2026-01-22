@@ -1,323 +1,437 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
-import { useData } from '@/contexts/DataContext';
-import { useAuth } from '@/contexts/AuthContext';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { apiFetch } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/app/components/ui/card';
 import { Button } from '@/app/components/ui/button';
 import { Input } from '@/app/components/ui/input';
 import { Label } from '@/app/components/ui/label';
 import { Textarea } from '@/app/components/ui/textarea';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/app/components/ui/select';
-import { FileUpload, UploadedFile } from '@/app/components/ui/file-upload';
-import { ArrowLeft, Calendar as CalendarIcon } from 'lucide-react';
+import { Badge } from '@/app/components/ui/badge';
+import { ArrowLeft, AlertCircle, X } from 'lucide-react';
 import { toast } from 'sonner';
-import { mockUsers } from '@/lib/mock-data';
-import { BookingStatus } from '@/lib/types';
-import { motion } from 'motion/react';
+
+type Staff = { id: number; name: string; phone_no: string };
+type Customer = { id: number; name: string; phone_no: string; email?: string; loyalty_number?: string };
+
+const parseBookingDate = (bookingDate: string) => {
+  // Parse the date in UTC and set it to the correct format
+  const date = new Date(bookingDate);
+  
+  // Ensure to format it in YYYY-MM-DD format without changing the day
+  const utcDate = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+
+  // Return the date as YYYY-MM-DD
+  return utcDate.toISOString().split('T')[0];
+};
 
 export function EditBooking() {
-  const { id } = useParams();
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const { getBookingById, updateBooking, customers } = useData();
 
-  const booking = id ? getBookingById(id) : null;
+  const [loading, setLoading] = useState(true);
+  const [conflict, setConflict] = useState<string | null>(null);
+
+  // Staff & Customer data
+  const [allStaff, setAllStaff] = useState<Staff[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
 
   const [formData, setFormData] = useState({
     customerId: '',
+    staffIds: [] as string[],
     date: '',
     startTime: '',
     endTime: '',
-    product: '',
+    serviceName: '',
     totalAmount: '',
-    staffId: '',
-    status: 'Scheduled' as BookingStatus,
     notes: '',
+    status: 'Scheduled' as 'Scheduled' | 'In Progress' | 'Completed' | 'Cancelled',
   });
 
-  const [servicePhotos, setServicePhotos] = useState<UploadedFile[]>([]);
-  const [documents, setDocuments] = useState<UploadedFile[]>([]);
+  const staffDropdownRef = useRef<HTMLDivElement>(null);
+  const customerDropdownRef = useRef<HTMLDivElement>(null);
 
+  // Fetch booking + related data
   useEffect(() => {
-    if (booking) {
-      setFormData({
-        customerId: booking.customerId,
-        date: booking.date,
-        startTime: booking.startTime,
-        endTime: booking.endTime,
-        product: booking.product,
-        totalAmount: booking.totalAmount.toString(),
-        staffId: booking.staffId,
-        status: booking.status,
-        notes: booking.notes || '',
-      });
-      setServicePhotos(booking.servicePhotos || []);
-      setDocuments(booking.documents || []);
-    }
-  }, [booking]);
+    if (!id) return;
 
-  if (!booking) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <div className="text-center">
-          <p className="text-xl text-gray-600">Booking not found</p>
-          <Link to="/bookings">
-            <Button className="mt-4">Back to Bookings</Button>
-          </Link>
-        </div>
-      </div>
-    );
+    (async () => {
+      try {
+        setLoading(true);
+
+        // 1. Get booking
+        const bookingRes = await apiFetch(`/api/bookings/${id}`);
+        if (!bookingRes.ok) throw new Error('Booking not found');
+        const booking = await bookingRes.json();
+
+        console.log('📅 Booking data:', booking);
+        
+
+        // 2. Get assigned staff
+        const staffRes = await apiFetch(`/api/bookings/${id}/staff`);
+        const assignedStaff = staffRes.ok ? (await staffRes.json()) : [];
+
+        // 3. Get all staff (for picker)
+        const allStaffRes = await apiFetch('/api/users/staff');
+        const staffList = allStaffRes.ok ? (await allStaffRes.json()) : [];
+
+        setAllStaff(staffList);
+        setFormData({
+          customerId: String(booking.customer_id),
+          staffIds: assignedStaff.map((s: Staff) => String(s.id)),
+          date: parseBookingDate(booking.booking_date), 
+          startTime: booking.start_time.slice(0, 5), // HH:mm
+          endTime: booking.end_time?.slice(0, 5) || booking.start_time.slice(0, 5),
+          serviceName: booking.service_name || '',
+          totalAmount: String(booking.service_amount || ''),
+          notes: booking.note || '',
+          status: booking.status,
+        });
+
+        // Pre-fill customer search field
+        if (booking.customer_name) {
+          setCustomerSearch(booking.customer_name);
+        }
+      } catch (err: any) {
+        toast.error(err.message || 'Failed to load booking');
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [id]);
+
+  // Customer lazy search
+  useEffect(() => {
+    const q = customerSearch.trim();
+    if (q.length < 2) {
+      setCustomers([]);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        const res = await apiFetch(`/api/users/customers?search=${encodeURIComponent(q)}`);
+        if (res.ok) {
+          setCustomers(await res.json());
+        }
+      } catch {}
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [customerSearch]);
+
+  // Click outside → close dropdowns
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (!staffDropdownRef.current?.contains(e.target as Node)) {
+        // close staff dropdown if you add search there too
+      }
+      if (!customerDropdownRef.current?.contains(e.target as Node)) {
+        setShowCustomerDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const selectedStaff = useMemo(
+    () => allStaff.filter((s) => formData.staffIds.includes(String(s.id))),
+    [allStaff, formData.staffIds]
+  );
+
+  const toggleStaff = (staffId: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      staffIds: prev.staffIds.includes(staffId)
+        ? prev.staffIds.filter((id) => id !== staffId)
+        : [...prev.staffIds, staffId],
+    }));
+    setConflict(null);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setConflict(null);
+
+    if (
+      !formData.customerId ||
+      !formData.date ||
+      !formData.startTime ||
+      !formData.serviceName ||
+      formData.staffIds.length === 0
+    ) {
+      toast.error('Please fill required fields');
+      return;
+    }
+
+    try {
+      const payload = {
+        customer_id: Number(formData.customerId),
+        booking_date: formData.date,
+        start_time: formData.startTime,
+        end_time: formData.endTime || formData.startTime,
+        service_name: formData.serviceName,
+        service_amount: Number(formData.totalAmount) || 0,
+        note: formData.notes || null,
+        staff_ids: formData.staffIds.map(Number),
+        status: formData.status,
+      };
+
+      const res = await apiFetch(`/api/bookings/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(payload),
+      });
+
+      if (res.status === 409) {
+        const data = await res.json();
+        setConflict(data.message || 'Time slot conflict detected');
+        toast.error('Time conflict');
+        return;
+      }
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || 'Update failed');
+      }
+
+      toast.success('Booking updated');
+      navigate(`/bookings/${id}`);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update booking');
+    }
+  };
+
+  if (loading) {
+    return <div className="p-10 text-center">Loading booking...</div>;
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-
-    // Validation
-    if (!formData.customerId || !formData.date || !formData.startTime || !formData.endTime || !formData.product || !formData.totalAmount || !formData.staffId) {
-      toast.error('Please fill in all required fields');
-      return;
-    }
-
-    const totalAmount = parseFloat(formData.totalAmount);
-    if (isNaN(totalAmount) || totalAmount <= 0) {
-      toast.error('Please enter a valid amount');
-      return;
-    }
-
-    if (formData.startTime >= formData.endTime) {
-      toast.error('End time must be after start time');
-      return;
-    }
-
-    updateBooking(booking.id, {
-      customerId: formData.customerId,
-      date: formData.date,
-      startTime: formData.startTime,
-      endTime: formData.endTime,
-      product: formData.product,
-      totalAmount,
-      staffId: formData.staffId,
-      status: formData.status,
-      notes: formData.notes,
-      servicePhotos,
-      documents,
-    });
-
-    toast.success('Booking updated successfully');
-    navigate(`/bookings/${booking.id}`);
-  };
-
-  const handleChange = (field: string, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-  };
-
   return (
-    <motion.div
-      className="space-y-6"
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3 }}
-    >
-      {/* Header */}
+    <div className="space-y-6 pb-10">
       <div className="flex items-center gap-4">
-        <Button variant="outline" size="icon" onClick={() => navigate(`/bookings/${booking.id}`)}>
-          <ArrowLeft className="w-4 h-4" />
+        <Button variant="outline" size="icon" onClick={() => navigate(`/bookings/${id}`)}>
+          <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-blue-400 bg-clip-text text-transparent">
-            Edit Booking
-          </h1>
-          <p className="text-gray-600 mt-1">Update booking information</p>
+          <h1 className="text-2xl sm:text-3xl font-bold">Edit Booking</h1>
+          <p className="text-muted-foreground">Booking #{id}</p>
         </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <CalendarIcon className="w-5 h-5 text-blue-600" />
-            Booking Information
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Customer Selection */}
-              <div className="space-y-2">
-                <Label htmlFor="customerId">Customer *</Label>
-                <Select
-                  value={formData.customerId}
-                  onValueChange={(value) => handleChange('customerId', value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a customer" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {customers.map((customer) => (
-                      <SelectItem key={customer.id} value={customer.id}>
-                        {customer.fullName} - {customer.phoneNumber}
-                      </SelectItem>
+      <form onSubmit={handleSubmit}>
+        <div className="grid lg:grid-cols-3 gap-6">
+          {/* Left & Middle - main fields */}
+          <div className="lg:col-span-2 space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Booking Details</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-5">
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Date *</Label>
+                    <Input
+                      type="date"
+                      value={formData.date}
+                      onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Start Time *</Label>
+                    <Input
+                      type="time"
+                      value={formData.startTime}
+                      onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>End Time</Label>
+                    <Input
+                      type="time"
+                      value={formData.endTime}
+                      onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Status</Label>
+                    <select
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2"
+                      value={formData.status}
+                      onChange={(e) =>
+                        setFormData({ ...formData, status: e.target.value as any })
+                      }
+                    >
+                      <option value="pending">Pending</option>
+                      <option value="confirmed">Confirmed</option>
+                      <option value="completed">Completed</option>
+                      <option value="cancelled">Cancelled</option>
+                    </select>
+                  </div>
+                </div>
+
+                {conflict && (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded flex gap-2 items-start">
+                    <AlertCircle className="h-5 w-5 text-red-600 mt-0.5" />
+                    <div className="text-red-800 text-sm">{conflict}</div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Service & Price</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Service Name *</Label>
+                  <Input
+                    value={formData.serviceName}
+                    onChange={(e) => setFormData({ ...formData, serviceName: e.target.value })}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Total Amount (LKR)</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={formData.totalAmount}
+                    onChange={(e) => setFormData({ ...formData, totalAmount: e.target.value })}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Notes</Label>
+                  <Textarea
+                    value={formData.notes}
+                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                    rows={3}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Right column - Customer + Staff + Actions */}
+          <div className="space-y-6">
+            {/* Customer */}
+            {/* <Card>
+              <CardHeader>
+                <CardTitle>Customer</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4" ref={customerDropdownRef}>
+                  <div className="relative">
+                    <Input
+                      placeholder="Search customer..."
+                      value={customerSearch}
+                      onChange={(e) => {
+                        setCustomerSearch(e.target.value);
+                        setShowCustomerDropdown(true);
+                      }}
+                      onFocus={() => setShowCustomerDropdown(true)}
+                    />
+
+                    {showCustomerDropdown && customers.length > 0 && (
+                      <div className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-lg max-h-60 overflow-auto">
+                        {customers.map((c) => (
+                          <div
+                            key={c.id}
+                            className="p-3 hover:bg-gray-100 cursor-pointer flex justify-between"
+                            onClick={() => {
+                              setFormData({ ...formData, customerId: String(c.id) });
+                              setCustomerSearch(c.name);
+                              setShowCustomerDropdown(false);
+                            }}
+                          >
+                            <div>
+                              <div className="font-medium">{c.name}</div>
+                              <div className="text-sm text-muted-foreground">{c.phone_no}</div>
+                            </div>
+                            {formData.customerId === String(c.id) && <span>✓</span>}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card> */}
+
+            {/* Staff */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Assigned Staff *</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {/* Selected staff chips */}
+                  <div className="flex flex-wrap gap-2 min-h-[2.5rem]">
+                    {selectedStaff.map((s) => (
+                      <Badge key={s.id} variant="secondary" className="gap-1 px-3 py-1">
+                        {s.name}
+                        <button
+                          type="button"
+                          onClick={() => toggleStaff(String(s.id))}
+                          className="ml-1 text-muted-foreground hover:text-foreground"
+                        >
+                          <X size={14} />
+                        </button>
+                      </Badge>
                     ))}
-                  </SelectContent>
-                </Select>
-              </div>
+                    {selectedStaff.length === 0 && (
+                      <div className="text-sm text-muted-foreground">No staff selected</div>
+                    )}
+                  </div>
 
-              {/* Date */}
-              <div className="space-y-2">
-                <Label htmlFor="date">Date *</Label>
-                <Input
-                  id="date"
-                  type="date"
-                  value={formData.date}
-                  onChange={(e) => handleChange('date', e.target.value)}
-                  required
-                />
-              </div>
+                  {/* Staff picker */}
+                  <div className="relative" ref={staffDropdownRef}>
+                    <Input placeholder="Search & add staff..." readOnly className="bg-gray-50" />
+                    {/* You can add proper staff search+multi-select here similar to create form */}
+                    {/* For brevity → showing simple list of all staff */}
+                    <div className="mt-2 max-h-48 overflow-auto border rounded-md">
+                      {allStaff.map((s) => {
+                        const isSelected = formData.staffIds.includes(String(s.id));
+                        return (
+                          <div
+                            key={s.id}
+                            className={`p-2.5 cursor-pointer hover:bg-gray-100 flex items-center gap-2 ${
+                              isSelected ? 'bg-gray-100' : ''
+                            }`}
+                            onClick={() => toggleStaff(String(s.id))}
+                          >
+                            <div className="w-4 h-4 border rounded flex items-center justify-center">
+                              {isSelected && <span className="text-xs">✓</span>}
+                            </div>
+                            <div>
+                              <div>{s.name}</div>
+                              <div className="text-xs text-muted-foreground">{s.phone_no}</div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
-              {/* Start Time */}
-              <div className="space-y-2">
-                <Label htmlFor="startTime">Start Time *</Label>
-                <Input
-                  id="startTime"
-                  type="time"
-                  value={formData.startTime}
-                  onChange={(e) => handleChange('startTime', e.target.value)}
-                  required
-                />
-              </div>
-
-              {/* End Time */}
-              <div className="space-y-2">
-                <Label htmlFor="endTime">End Time *</Label>
-                <Input
-                  id="endTime"
-                  type="time"
-                  value={formData.endTime}
-                  onChange={(e) => handleChange('endTime', e.target.value)}
-                  required
-                />
-              </div>
-
-              {/* Product/Service */}
-              <div className="space-y-2">
-                <Label htmlFor="product">Product/Service *</Label>
-                <Input
-                  id="product"
-                  type="text"
-                  placeholder="e.g., AC Repair, Plumbing Service"
-                  value={formData.product}
-                  onChange={(e) => handleChange('product', e.target.value)}
-                  required
-                />
-              </div>
-
-              {/* Total Amount */}
-              <div className="space-y-2">
-                <Label htmlFor="totalAmount">Total Amount (LKR) *</Label>
-                <Input
-                  id="totalAmount"
-                  type="number"
-                  step="0.01"
-                  placeholder="0.00"
-                  value={formData.totalAmount}
-                  onChange={(e) => handleChange('totalAmount', e.target.value)}
-                  required
-                />
-              </div>
-
-              {/* Staff Assignment */}
-              <div className="space-y-2">
-                <Label htmlFor="staffId">Assign Staff *</Label>
-                <Select
-                  value={formData.staffId}
-                  onValueChange={(value) => handleChange('staffId', value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select staff member" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {mockUsers
-                      .filter((u) => u.role === 'Staff' || u.role === 'Manager')
-                      .map((staff) => (
-                        <SelectItem key={staff.id} value={staff.id}>
-                          {staff.fullName}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Status */}
-              <div className="space-y-2">
-                <Label htmlFor="status">Status *</Label>
-                <Select
-                  value={formData.status}
-                  onValueChange={(value) => handleChange('status', value as BookingStatus)}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Scheduled">Scheduled</SelectItem>
-                    <SelectItem value="In Progress">In Progress</SelectItem>
-                    <SelectItem value="Completed">Completed</SelectItem>
-                    <SelectItem value="Cancelled">Cancelled</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {/* Notes */}
-            <div className="space-y-2">
-              <Label htmlFor="notes">Notes (Optional)</Label>
-              <Textarea
-                id="notes"
-                placeholder="Add any additional notes or instructions"
-                value={formData.notes}
-                onChange={(e) => handleChange('notes', e.target.value)}
-                rows={4}
-              />
-            </div>
-
-            <FileUpload
-              value={servicePhotos}
-              onChange={setServicePhotos}
-              accept="image/*"
-              maxFiles={10}
-              label="Service Photos (Optional)"
-              description="Upload before/after photos of the service"
-            />
-
-            <FileUpload
-              value={documents}
-              onChange={setDocuments}
-              accept=".pdf,.doc,.docx"
-              maxFiles={5}
-              label="Documents (Optional)"
-              description="Upload invoices, warranties, or other documents"
-            />
-
-            {/* Action Buttons */}
-            <div className="flex gap-3 pt-4 border-t">
-              <Button type="submit" className="flex-1 bg-gradient-to-r from-blue-600 to-blue-500">
-                Update Booking
+            {/* Actions */}
+            <div className="flex flex-col gap-3 sticky top-4">
+              <Button type="submit" className="w-full">
+                Save Changes
               </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => navigate(`/bookings/${booking.id}`)}
-              >
+              <Button variant="outline" className="w-full" onClick={() => navigate(`/bookings/${id}`)}>
                 Cancel
               </Button>
             </div>
-          </form>
-        </CardContent>
-      </Card>
-    </motion.div>
+          </div>
+        </div>
+      </form>
+    </div>
   );
 }

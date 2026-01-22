@@ -1,12 +1,12 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { useData } from '@/contexts/DataContext';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { apiFetch } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/app/components/ui/card';
 import { Button } from '@/app/components/ui/button';
 import { Input } from '@/app/components/ui/input';
 import { Badge } from '@/app/components/ui/badge';
 import { DeleteConfirmDialog } from '@/app/components/DeleteConfirmDialog';
-import { Plus, Search, Eye, Edit2, Trash2 } from 'lucide-react';
+import { Plus, Search, Eye, Edit2, Trash2, Loader2 } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -15,36 +15,79 @@ import {
   TableHeader,
   TableRow,
 } from '@/app/components/ui/table';
-import { formatCurrency } from '@/lib/utils';
 import { toast } from 'sonner';
 import { motion } from 'motion/react';
 
+type Customer = {
+  id: number;
+  name: string;
+  phone_no: string;
+  email?: string | null;
+  loyalty_number?: string | null;
+  address?: string | null;
+};
+
+type CustomerStats = {
+  total_amount: number;
+  paid_amount: number;
+  outstanding_balance: number;
+};
+
 export function CustomersPage() {
-  const { customers, bookings, deleteCustomer } = useData();
+  const navigate = useNavigate();
+
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [customerStats, setCustomerStats] = useState<Record<number, CustomerStats>>({});
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [customerToDelete, setCustomerToDelete] = useState<string | null>(null);
+  const [customerToDelete, setCustomerToDelete] = useState<number | null>(null);
 
-  const filteredCustomers = customers.filter((customer) => {
-    return (
-      customer.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      customer.phoneNumber.includes(searchTerm) ||
-      customer.email?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  });
+  // Fetch customers + their stats
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      // Fetch all customers
+      const custRes = await apiFetch('/api/users/customers?search=');
+      if (!custRes.ok) throw new Error('Failed to load customers');
+      const custData = await custRes.json();
+      setCustomers(custData);
 
-  const getCustomerBalance = (customerId: string) => {
-    const customerBookings = bookings.filter((b) => b.customerId === customerId);
-    return customerBookings.reduce(
-      (total, booking) => total + (booking.totalAmount - booking.paidAmount),
-      0
-    );
+      // Fetch customer stats (outstanding balance)
+      const statsRes = await apiFetch('/api/users/customers/stats');
+      if (statsRes.ok) {
+        const statsData = await statsRes.json();
+        console.log('👥 Customer stats data:', statsData);
+        setCustomerStats(statsData);
+      }
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || 'Failed to load customers');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleDeleteClick = (customerId: string) => {
-    // Check if customer has bookings
-    const hasBookings = bookings.some((b) => b.customerId === customerId);
-    if (hasBookings) {
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const filteredCustomers = customers.filter((c) =>
+    c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    c.phone_no.includes(searchTerm) ||
+    (c.email && c.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (c.loyalty_number && c.loyalty_number.toLowerCase().includes(searchTerm.toLowerCase()))
+
+  );
+
+  const getCustomerBalance = (customerId: number): number => {
+    return customerStats[customerId]?.outstanding_balance || 0;
+  };
+
+  const handleDeleteClick = (customerId: number) => {
+    // Check if customer has any bookings (outstanding balance or total amount > 0)
+    const stats = customerStats[customerId];
+    if (stats && stats.total_amount > 0) {
       toast.error('Cannot delete customer with existing bookings');
       return;
     }
@@ -52,14 +95,39 @@ export function CustomersPage() {
     setDeleteDialogOpen(true);
   };
 
-  const handleDeleteConfirm = () => {
-    if (customerToDelete) {
-      deleteCustomer(customerToDelete);
+  const handleDeleteConfirm = async () => {
+    if (!customerToDelete) return;
+
+    try {
+      const res = await apiFetch(`/api/users/${customerToDelete}`, {
+        method: 'DELETE',
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || 'Delete failed');
+      }
+
       toast.success('Customer deleted successfully');
       setDeleteDialogOpen(false);
       setCustomerToDelete(null);
+      fetchData();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to delete customer');
     }
   };
+
+  const formatCurrency = (amount: number) => {
+    return `LKR ${amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
 
   return (
     <motion.div
@@ -75,13 +143,13 @@ export function CustomersPage() {
         transition={{ delay: 0.1 }}
       >
         <div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-blue-400 bg-clip-text text-transparent">
-            Customers
-          </h1>
-          <p className="text-gray-600 mt-1">Manage customer information and records</p>
+          <h1 className="text-3xl font-bold">Customers</h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">
+            Manage customer information and records
+          </p>
         </div>
         <Link to="/customers/new">
-          <Button className="bg-gradient-to-r from-blue-600 to-blue-500 shadow-lg hover:shadow-xl transition-all">
+          <Button>
             <Plus className="w-4 h-4 mr-2" />
             Add Customer
           </Button>
@@ -96,7 +164,7 @@ export function CustomersPage() {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
             <Input
-              placeholder="Search by name, phone, or email..."
+              placeholder="Search by name, phone,Loyalty # or email..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
@@ -132,14 +200,16 @@ export function CustomersPage() {
 
                     return (
                       <TableRow key={customer.id}>
-                        <TableCell className="font-medium">{customer.fullName}</TableCell>
-                        <TableCell>{customer.phoneNumber}</TableCell>
-                        <TableCell>{customer.email || '-'}</TableCell>
+                        <TableCell className="font-medium">{customer.name}</TableCell>
+                        <TableCell>{customer.phone_no}</TableCell>
+                        <TableCell className="text-gray-600 dark:text-gray-400">
+                          {customer.email || '-'}
+                        </TableCell>
                         <TableCell>
-                          {customer.loyaltyNumber ? (
-                            <Badge variant="outline">{customer.loyaltyNumber}</Badge>
+                          {customer.loyalty_number ? (
+                            <Badge variant="outline">{customer.loyalty_number}</Badge>
                           ) : (
-                            '-'
+                            <span className="text-gray-400">-</span>
                           )}
                         </TableCell>
                         <TableCell>
@@ -148,7 +218,9 @@ export function CustomersPage() {
                               {formatCurrency(balance)}
                             </span>
                           ) : (
-                            <span className="text-green-600">-</span>
+                            <span className="text-green-600 font-medium">
+                              {formatCurrency(0)}
+                            </span>
                           )}
                         </TableCell>
                         <TableCell className="text-right">
@@ -163,10 +235,10 @@ export function CustomersPage() {
                                 <Edit2 className="w-4 h-4" />
                               </Button>
                             </Link>
-                            <Button 
-                              size="sm" 
-                              variant="ghost" 
-                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
                               onClick={() => handleDeleteClick(customer.id)}
                             >
                               <Trash2 className="w-4 h-4" />
@@ -183,14 +255,17 @@ export function CustomersPage() {
         </CardContent>
       </Card>
 
-      {/* Delete Confirmation Dialog */}
       <DeleteConfirmDialog
         open={deleteDialogOpen}
         onOpenChange={setDeleteDialogOpen}
         onConfirm={handleDeleteConfirm}
         title="Delete Customer"
         description="Are you sure you want to delete this customer? This action cannot be undone."
-        itemName={customerToDelete ? customers.find(c => c.id === customerToDelete)?.fullName : ''}
+        itemName={
+          customerToDelete
+            ? customers.find((c) => c.id === customerToDelete)?.name || 'this customer'
+            : ''
+        }
       />
     </motion.div>
   );

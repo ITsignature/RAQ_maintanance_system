@@ -12,7 +12,7 @@ function cookieOptions() {
     httpOnly: true,
     secure: process.env.COOKIE_SECURE === "true",
     sameSite: "lax",
-    path: "/auth/refresh",
+    path: "/api/auth/refresh",
     domain: process.env.COOKIE_DOMAIN || undefined,
   };
 }
@@ -30,18 +30,18 @@ router.post("/login", async (req, res) => {
     return res.status(401).json({ message: "Invalid credentials" });
   }
 
+  // ✅ correct compare
   const ok = await bcrypt.compare(password, user.password_hash);
   if (!ok) return res.status(401).json({ message: "Invalid credentials" });
 
-  // Only staff allowed
-  if (![1, 2].includes(user.role)) {
+  // Only staff/admin/super can log in
+  if (![1, 2, 3].includes(user.role)) {
     return res.status(403).json({ message: "Customers cannot log in" });
   }
 
   const accessToken = signAccessToken(user);
   const refreshToken = signRefreshToken(user);
 
-  // store refresh token
   const tokenHash = hashToken(refreshToken);
   const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
@@ -61,60 +61,65 @@ router.post("/login", async (req, res) => {
 
 
 
+
 router.post("/refresh", async (req, res) => {
-  const token = req.cookies.refresh_token;
-  if (!token) return res.status(401).json({ message: "Missing refresh token" });
-
-  let payload;
   try {
-    payload = jwt.verify(token, process.env.REFRESH_TOKEN_SECRET);
-  } catch {
-    return res.status(401).json({ message: "Invalid/expired refresh token" });
+    const token = req.cookies?.refresh_token;
+    if (!token) return res.status(401).json({ message: "Missing refresh token" });
+
+    let payload;
+    try {
+      payload = jwt.verify(token, process.env.REFRESH_TOKEN_SECRET);
+    } catch {
+      return res.status(401).json({ message: "Invalid/expired refresh token" });
+    }
+
+    const tokenHash = hashToken(token);
+
+    const [rows] = await pool.query(
+      `SELECT id, user_id FROM refresh_tokens
+       WHERE token_hash=? AND revoked_at IS NULL AND expires_at > NOW()
+       LIMIT 1`,
+      [tokenHash]
+    );
+
+    const record = rows[0];
+    if (!record) return res.status(401).json({ message: "Refresh token revoked" });
+
+    // ✅ FIX: role not role_id
+    const [urows] = await pool.query(
+      "SELECT id, name, role, phone_no, is_active FROM users WHERE id=? LIMIT 1",
+      [payload.sub]
+    );
+
+    const user = urows[0];
+    if (!user || !user.is_active) return res.status(401).json({ message: "User inactive" });
+
+    // rotate old refresh token
+    await pool.query("UPDATE refresh_tokens SET revoked_at=NOW() WHERE id=?", [record.id]);
+
+    const newRefresh = signRefreshToken(user);
+    const newHash = hashToken(newRefresh);
+
+    const days = Number(process.env.REFRESH_TOKEN_TTL_DAYS || 30);
+    const expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+
+    await pool.query(
+      `INSERT INTO refresh_tokens (user_id, token_hash, expires_at, user_agent, ip)
+       VALUES (?, ?, ?, ?, ?)`,
+      [user.id, newHash, expiresAt, req.get("user-agent"), req.ip]
+    );
+
+    const accessToken = signAccessToken(user);
+
+    return res
+      .cookie("refresh_token", newRefresh, cookieOptions())
+      .json({ accessToken });
+  } catch (err) {
+    console.error("REFRESH ERROR:", err);
+    return res.status(500).json({ message: "Refresh failed" });
   }
-
-  const tokenHash = hashToken(token);
-
-  // Check token exists and not revoked and not expired
-  const [rows] = await pool.query(
-    `SELECT * FROM refresh_tokens
-     WHERE token_hash=? AND revoked_at IS NULL AND expires_at > NOW()
-     LIMIT 1`,
-    [tokenHash]
-  );
-
-  const record = rows[0];
-  if (!record) return res.status(401).json({ message: "Refresh token revoked" });
-
-  // Load user
-  const [urows] = await pool.query(
-    "SELECT id, name, role_id, phone_no, is_active FROM users WHERE id=? LIMIT 1",
-    [payload.sub]
-  );
-  const user = urows[0];
-  if (!user || !user.is_active) return res.status(401).json({ message: "User inactive" });
-
-  // rotate refresh token: revoke old and create new
-  await pool.query("UPDATE refresh_tokens SET revoked_at=NOW() WHERE id=?", [record.id]);
-
-  const newRefresh = signRefreshToken(user);
-  const newHash = hashToken(newRefresh);
-
-  const days = Number(process.env.REFRESH_TOKEN_TTL_DAYS || 30);
-  const expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
-
-  await pool.query(
-    `INSERT INTO refresh_tokens (user_id, token_hash, expires_at, user_agent, ip)
-     VALUES (?, ?, ?, ?, ?)`,
-    [user.id, newHash, expiresAt, req.get("user-agent"), req.ip]
-  );
-
-  const accessToken = signAccessToken(user);
-
-  res
-    .cookie("refresh_token", newRefresh, cookieOptions())
-    .json({ accessToken });
 });
-
 
 router.post("/logout", async (req, res) => {
   const token = req.cookies.refresh_token;
@@ -127,6 +132,19 @@ router.post("/logout", async (req, res) => {
   }
   res.clearCookie("refresh_token", cookieOptions());
   res.json({ message: "Logged out" });
+});
+
+
+
+
+router.get("/me", requireAuth, async (req, res) => {
+  const [rows] = await pool.query(
+    "SELECT id, name, role FROM users WHERE id=? LIMIT 1",
+    [req.user.id]
+  );
+  const user = rows[0];
+  if (!user) return res.status(404).json({ message: "User not found" });
+  res.json({ user });
 });
 
 

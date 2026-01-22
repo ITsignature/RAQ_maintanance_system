@@ -1,12 +1,17 @@
-import React, { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/app/components/ui/card';
-import { Button } from '@/app/components/ui/button';
-import { Input } from '@/app/components/ui/input';
-import { Label } from '@/app/components/ui/label';
-import { Textarea } from '@/app/components/ui/textarea';
-import { Switch } from '@/app/components/ui/switch';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/app/components/ui/tabs';
-import { Badge } from '@/app/components/ui/badge';
+import React, { useEffect, useMemo, useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import { apiFetch } from "@/lib/api";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/app/components/ui/card";
+import { Button } from "@/app/components/ui/button";
+import { Input } from "@/app/components/ui/input";
+import { Label } from "@/app/components/ui/label";
+import { Badge } from "@/app/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -14,14 +19,14 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/app/components/ui/dialog';
+} from "@/app/components/ui/dialog";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/app/components/ui/select';
+} from "@/app/components/ui/select";
 import {
   Table,
   TableBody,
@@ -29,585 +34,311 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/app/components/ui/table';
-import { mockUsers } from '@/lib/mock-data';
-import { CreditCard, Users as UsersIcon, Settings as SettingsIcon, MessageSquare, Shield, Plus } from 'lucide-react';
-import { toast } from 'sonner';
-import { motion } from 'motion/react';
+} from "@/app/components/ui/table";
+import { toast } from "sonner";
+import { Plus, Users as UsersIcon } from "lucide-react";
+import { motion } from "motion/react";
+
+type UserRow = {
+  id: number;
+  name: string;
+  phone_no: string;
+  email: string | null;
+  role: number; // 2 admin, 3 staff
+  is_active: number; // 1/0
+  created_at: string;
+};
 
 export function SettingsPage() {
-  const [paymentMethods, setPaymentMethods] = useState([
-    { id: '1', name: 'Cash', isActive: true, isDefault: true },
-    { id: '2', name: 'Card', isActive: true, isDefault: false },
-    { id: '3', name: 'Online Transfer', isActive: true, isDefault: false },
-    { id: '4', name: 'Other', isActive: true, isDefault: false },
-  ]);
+  const { user } = useAuth();
 
-  const [systemSettings, setSystemSettings] = useState({
-    defaultBookingDuration: '60',
-    businessHoursStart: '08:00',
-    businessHoursEnd: '18:00',
-    timezone: 'Asia/Colombo',
-    currency: 'LKR',
+  // Only admin/super can see this page
+  const isAdmin = useMemo(() => user?.role === 1 || user?.role === 2, [user]);
+
+  const [users, setUsers] = useState<UserRow[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [form, setForm] = useState({
+    name: "",
+    phone_no: "",
+    email: "",
+    role: "3", // default Staff
+    password: "",
   });
 
-  const [smsTemplates] = useState([
-    {
-      id: '1',
-      name: 'Booking Confirmation',
-      template: 'Hi {customer_name}, your booking for {product} on {date} at {time} has been confirmed.',
-    },
-    {
-      id: '2',
-      name: 'Reminder (1 day before)',
-      template: 'Hi {customer_name}, reminder: You have a booking for {product} tomorrow at {time}.',
-    },
-    {
-      id: '3',
-      name: 'Completion Notification',
-      template: 'Hi {customer_name}, your {product} has been completed. Thank you for choosing our services!',
-    },
-    {
-      id: '4',
-      name: 'Reschedule Notification',
-      template: 'Hi {customer_name}, your booking has been rescheduled to {date} at {time}.',
-    },
-  ]);
+  const roleLabel = (r: number) => (r === 2 ? "Admin" : r === 3 ? "Staff" : "Unknown");
 
-  const [securitySettings, setSecuritySettings] = useState({
-    minPasswordLength: '8',
-    requireSpecialChars: true,
-    passwordExpiryDays: '90',
-    sessionTimeoutMinutes: '30',
-  });
-
-  // User management state
-  const [isUserDialogOpen, setIsUserDialogOpen] = useState(false);
-  const [editingUser, setEditingUser] = useState<any>(null);
-  const [userFormData, setUserFormData] = useState({
-    fullName: '',
-    phoneNumber: '',
-    email: '',
-    role: 'Staff',
-    password: '',
-  });
-
-  const handleSavePaymentMethods = () => {
-    toast.success('Payment methods updated successfully');
-  };
-
-  const handleSaveSystemSettings = () => {
-    toast.success('System settings updated successfully');
-  };
-
-  const handleSaveSecuritySettings = () => {
-    toast.success('Security settings updated successfully');
-  };
-
-  // User management functions
-  const handleOpenUserDialog = (user?: any) => {
-    if (user) {
-      setEditingUser(user);
-      setUserFormData({
-        fullName: user.fullName,
-        phoneNumber: user.phoneNumber,
-        email: user.email,
-        role: user.role,
-        password: '',
-      });
-    } else {
-      setEditingUser(null);
-      setUserFormData({
-        fullName: '',
-        phoneNumber: '',
-        email: '',
-        role: 'Staff',
-        password: '',
-      });
+  async function loadUsers() {
+    setLoading(true);
+    try {
+      const res = await apiFetch("/api/users");
+      if (!res.ok) throw new Error("Failed to load users");
+      const data = await res.json();
+      setUsers(data);
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to load users");
+    } finally {
+      setLoading(false);
     }
-    setIsUserDialogOpen(true);
+  }
+
+  useEffect(() => {
+    if (isAdmin) loadUsers();
+  }, [isAdmin]);
+
+  const openDialog = () => {
+    setForm({ name: "", phone_no: "", email: "", role: "3", password: "" });
+    setIsDialogOpen(true);
   };
 
-  const handleCloseUserDialog = () => {
-    setIsUserDialogOpen(false);
-    setEditingUser(null);
-    setUserFormData({
-      fullName: '',
-      phoneNumber: '',
-      email: '',
-      role: 'Staff',
-      password: '',
-    });
-  };
+  const closeDialog = () => setIsDialogOpen(false);
 
-  const handleSaveUser = () => {
-    if (!userFormData.fullName || !userFormData.phoneNumber || !userFormData.email) {
-      toast.error('Please fill in all required fields');
+  const handleCreateUser = async () => {
+    if (!form.name || !form.phone_no || !form.password) {
+      toast.error("Name, phone number, and password are required");
       return;
     }
 
-    if (!editingUser && !userFormData.password) {
-      toast.error('Password is required for new users');
-      return;
-    }
+    try {
+      const res = await apiFetch("/api/users", {
+        method: "POST",
+        body: JSON.stringify({
+          name: form.name,
+          phone_no: form.phone_no,
+          email: form.email || null,
+          password: form.password,
+          role: Number(form.role), // 2 or 3
+        }),
+      });
 
-    if (editingUser) {
-      toast.success('User updated successfully');
-    } else {
-      toast.success('User added successfully');
+      if (res.status === 409) return toast.error("Phone/email already exists");
+
+      if (!res.ok) {
+        const msg = await res.json().catch(() => null);
+        return toast.error(msg?.message || "Failed to create user");
+      }
+
+      toast.success("User created");
+      closeDialog();
+      loadUsers();
+    } catch {
+      toast.error("Failed to create user");
     }
-    
-    handleCloseUserDialog();
   };
 
-  const handleDeactivateUser = (user: any) => {
-    toast.success(`User ${user.fullName} deactivated successfully`);
+  const deactivateStaff = async (id: number) => {
+    try {
+      const res = await apiFetch(`/api/users/${id}/deactivate`, { method: "PATCH" });
+      const msg = await res.json().catch(() => null);
+      if (!res.ok) return toast.error(msg?.message || "Failed to deactivate");
+      toast.success("Staff deactivated");
+      loadUsers();
+    } catch {
+      toast.error("Failed to deactivate");
+    }
   };
+
+  const activateStaff = async (id: number) => {
+    try {
+      const res = await apiFetch(`/api/users/${id}/activate`, { method: "PATCH" });
+      const msg = await res.json().catch(() => null);
+      if (!res.ok) return toast.error(msg?.message || "Failed to activate");
+      toast.success("Staff activated");
+      loadUsers();
+    } catch {
+      toast.error("Failed to activate");
+    }
+  };
+
+  if (!isAdmin) {
+    return (
+      <div className="p-4 sm:p-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Access denied</CardTitle>
+            <CardDescription>Only admins can manage users.</CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-0">
       <motion.div
-        initial={{ opacity: 0, y: -20 }}
+        initial={{ opacity: 0, y: -12 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3 }}
+        transition={{ duration: 0.25 }}
       >
-        <h1 className="text-3xl font-bold">Settings</h1>
-        <p className="text-muted-foreground mt-1">System configuration and preferences</p>
+        <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
+          <UsersIcon className="w-6 h-6 sm:w-7 sm:h-7" /> Users
+        </h1>
+        <p className="text-muted-foreground mt-1 text-sm sm:text-base">
+          Create and manage Admin and Staff accounts
+        </p>
       </motion.div>
 
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3, delay: 0.1 }}
-      >
-        <Tabs defaultValue="payment-methods" className="space-y-6">
-          <TabsList>
-            <TabsTrigger value="payment-methods">
-              <CreditCard className="w-4 h-4 mr-2" />
-              Payment Methods
-            </TabsTrigger>
-            <TabsTrigger value="users">
-              <UsersIcon className="w-4 h-4 mr-2" />
-              Users
-            </TabsTrigger>
-            <TabsTrigger value="system">
-              <SettingsIcon className="w-4 h-4 mr-2" />
-              System
-            </TabsTrigger>
-            <TabsTrigger value="sms">
-              <MessageSquare className="w-4 h-4 mr-2" />
-              SMS Templates
-            </TabsTrigger>
-            <TabsTrigger value="security">
-              <Shield className="w-4 h-4 mr-2" />
-              Security
-            </TabsTrigger>
-          </TabsList>
+      <Card>
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <CardTitle>User Accounts</CardTitle>
+            <CardDescription>Admins (role 2) and Staff (role 3)</CardDescription>
+          </div>
 
-          {/* Payment Methods Tab */}
-          <TabsContent value="payment-methods">
-            <Card>
-              <CardHeader>
-                <CardTitle>Payment Methods</CardTitle>
-                <CardDescription>
-                  Manage available payment methods for bookings
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {paymentMethods.map((method) => (
-                    <div
-                      key={method.id}
-                      className="flex items-center justify-between p-4 border rounded-lg"
-                    >
-                      <div className="flex items-center gap-4">
-                        <Switch
-                          checked={method.isActive}
-                          onCheckedChange={(checked) => {
-                            setPaymentMethods(
-                              paymentMethods.map((m) =>
-                                m.id === method.id ? { ...m, isActive: checked } : m
-                              )
-                            );
-                          }}
-                        />
-                        <div>
-                          <p className="font-medium">{method.name}</p>
-                          {method.isDefault && (
-                            <Badge variant="outline" className="mt-1">
-                              Default
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setPaymentMethods(
-                              paymentMethods.map((m) => ({
-                                ...m,
-                                isDefault: m.id === method.id,
-                              }))
-                            );
-                          }}
-                        >
-                          Set as Default
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                  <Button variant="outline" className="w-full">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Payment Method
-                  </Button>
-                  <div className="pt-4">
-                    <Button onClick={handleSavePaymentMethods}>Save Changes</Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
+          <Button onClick={openDialog} className="w-full sm:w-auto">
+            <Plus className="w-4 h-4 mr-2" />
+            Add User
+          </Button>
+        </CardHeader>
 
-          {/* Users Tab */}
-          <TabsContent value="users">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle>User Accounts</CardTitle>
-                  <CardDescription>Manage system users and their roles</CardDescription>
-                </div>
-                <Button onClick={() => handleOpenUserDialog()}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add User
-                </Button>
-              </CardHeader>
-              <CardContent className="p-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Full Name</TableHead>
-                      <TableHead>Phone Number</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Role</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {mockUsers.map((user) => (
-                      <TableRow key={user.id}>
-                        <TableCell className="font-medium">{user.fullName}</TableCell>
-                        <TableCell>{user.phoneNumber}</TableCell>
-                        <TableCell>{user.email}</TableCell>
+        <CardContent className="p-0">
+          {/* Mobile friendly: horizontal scroll */}
+          <div className="w-full overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Phone</TableHead>
+                  <TableHead className="hidden md:table-cell">Email</TableHead>
+                  <TableHead>Role</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+
+              <TableBody>
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-6">
+                      Loading...
+                    </TableCell>
+                  </TableRow>
+                ) : users.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-6">
+                      No users found
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  users.map((u) => {
+                    const isStaff = u.role === 3;
+                    const isAdminRow = u.role === 2;
+
+                    return (
+                      <TableRow key={u.id}>
+                        <TableCell className="font-medium">{u.name}</TableCell>
+                        <TableCell>{u.phone_no}</TableCell>
+                        <TableCell className="hidden md:table-cell">
+                          {u.email || "-"}
+                        </TableCell>
                         <TableCell>
-                          <Badge variant={user.role === 'Admin' ? 'default' : 'outline'}>
-                            {user.role}
+                          <Badge variant={u.role === 2 ? "default" : "outline"}>
+                            {roleLabel(u.role)}
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <Badge className="bg-green-100 text-green-800">Active</Badge>
+                          {u.is_active ? (
+                            <Badge className="bg-green-100 text-green-800">Active</Badge>
+                          ) : (
+                            <Badge className="bg-gray-200 text-gray-800">Inactive</Badge>
+                          )}
                         </TableCell>
+
                         <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
-                            <Button size="sm" variant="outline" onClick={() => handleOpenUserDialog(user)}>
-                              Edit
-                            </Button>
-                            <Button size="sm" variant="outline" onClick={() => handleDeactivateUser(user)}>
-                              Deactivate
-                            </Button>
-                          </div>
+                          {/* Admin accounts: no deactivate/reactivate */}
+                          {isAdminRow ? (
+                            <span className="text-muted-foreground text-sm">—</span>
+                          ) : isStaff ? (
+                            u.is_active ? (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => deactivateStaff(u.id)}
+                              >
+                                Deactivate
+                              </Button>
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => activateStaff(u.id)}
+                              >
+                                Reactivate
+                              </Button>
+                            )
+                          ) : (
+                            <span className="text-muted-foreground text-sm">—</span>
+                          )}
                         </TableCell>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
 
-            {/* User Management Dialog */}
-            <Dialog open={isUserDialogOpen} onOpenChange={setIsUserDialogOpen}>
-              <DialogContent className="sm:max-w-[425px]">
-                <DialogHeader>
-                  <DialogTitle>{editingUser ? 'Edit User' : 'Add User'}</DialogTitle>
-                  <DialogDescription>
-                    {editingUser ? 'Edit user details' : 'Add a new user to the system'}
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="fullName">Full Name</Label>
-                    <Input
-                      id="fullName"
-                      value={userFormData.fullName}
-                      onChange={(e) => setUserFormData({ ...userFormData, fullName: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="phoneNumber">Phone Number</Label>
-                    <Input
-                      id="phoneNumber"
-                      value={userFormData.phoneNumber}
-                      onChange={(e) => setUserFormData({ ...userFormData, phoneNumber: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
-                    <Input
-                      id="email"
-                      value={userFormData.email}
-                      onChange={(e) => setUserFormData({ ...userFormData, email: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="role">Role</Label>
-                    <Select
-                      value={userFormData.role}
-                      onValueChange={(value) => setUserFormData({ ...userFormData, role: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue>{userFormData.role}</SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Admin">Admin</SelectItem>
-                        <SelectItem value="Staff">Staff</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  {!editingUser && (
-                    <div className="space-y-2">
-                      <Label htmlFor="password">Password</Label>
-                      <Input
-                        id="password"
-                        type="password"
-                        value={userFormData.password}
-                        onChange={(e) => setUserFormData({ ...userFormData, password: e.target.value })}
-                      />
-                    </div>
-                  )}
-                </div>
-                <DialogFooter>
-                  <Button type="button" onClick={handleCloseUserDialog}>
-                    Cancel
-                  </Button>
-                  <Button type="button" onClick={handleSaveUser}>
-                    {editingUser ? 'Update User' : 'Add User'}
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          </TabsContent>
+      {/* Add User Dialog */}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="sm:max-w-[450px]">
+          <DialogHeader>
+            <DialogTitle>Add User</DialogTitle>
+            <DialogDescription>Create an Admin or Staff account</DialogDescription>
+          </DialogHeader>
 
-          {/* System Preferences Tab */}
-          <TabsContent value="system">
-            <Card>
-              <CardHeader>
-                <CardTitle>System Preferences</CardTitle>
-                <CardDescription>Configure general system settings</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <Label htmlFor="duration">Default Booking Duration (minutes)</Label>
-                      <Input
-                        id="duration"
-                        type="number"
-                        value={systemSettings.defaultBookingDuration}
-                        onChange={(e) =>
-                          setSystemSettings({
-                            ...systemSettings,
-                            defaultBookingDuration: e.target.value,
-                          })
-                        }
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="timezone">Timezone</Label>
-                      <Input
-                        id="timezone"
-                        value={systemSettings.timezone}
-                        onChange={(e) =>
-                          setSystemSettings({ ...systemSettings, timezone: e.target.value })
-                        }
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="startTime">Business Hours Start</Label>
-                      <Input
-                        id="startTime"
-                        type="time"
-                        value={systemSettings.businessHoursStart}
-                        onChange={(e) =>
-                          setSystemSettings({
-                            ...systemSettings,
-                            businessHoursStart: e.target.value,
-                          })
-                        }
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="endTime">Business Hours End</Label>
-                      <Input
-                        id="endTime"
-                        type="time"
-                        value={systemSettings.businessHoursEnd}
-                        onChange={(e) =>
-                          setSystemSettings({
-                            ...systemSettings,
-                            businessHoursEnd: e.target.value,
-                          })
-                        }
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="currency">Currency</Label>
-                      <Input
-                        id="currency"
-                        value={systemSettings.currency}
-                        onChange={(e) =>
-                          setSystemSettings({ ...systemSettings, currency: e.target.value })
-                        }
-                      />
-                    </div>
-                  </div>
-                  <div className="pt-4">
-                    <Button onClick={handleSaveSystemSettings}>Save Settings</Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Name</Label>
+              <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            </div>
 
-          {/* SMS Templates Tab */}
-          <TabsContent value="sms">
-            <Card>
-              <CardHeader>
-                <CardTitle>SMS Templates</CardTitle>
-                <CardDescription>
-                  Customize SMS message templates. Use variables like {'{customer_name}'}, {'{date}'},
-                  {'{time}'}, {'{product}'}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {smsTemplates.map((template) => (
-                    <div key={template.id} className="space-y-2 p-4 border rounded-lg">
-                      <div className="flex items-center justify-between">
-                        <Label className="text-base font-medium">{template.name}</Label>
-                        <Button size="sm" variant="outline">
-                          Edit
-                        </Button>
-                      </div>
-                      <Textarea value={template.template} readOnly className="bg-gray-50" rows={3} />
-                    </div>
-                  ))}
-                  <div className="pt-4">
-                    <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                      <p className="text-sm font-medium text-blue-900 mb-2">
-                        Available Variables:
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        {[
-                          '{customer_name}',
-                          '{date}',
-                          '{time}',
-                          '{product}',
-                          '{staff_name}',
-                          '{amount}',
-                        ].map((variable) => (
-                          <Badge key={variable} variant="outline">
-                            {variable}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
+            <div className="space-y-2">
+              <Label>Phone Number</Label>
+              <Input
+                value={form.phone_no}
+                onChange={(e) => setForm({ ...form, phone_no: e.target.value })}
+              />
+            </div>
 
-          {/* Security Tab */}
-          <TabsContent value="security">
-            <Card>
-              <CardHeader>
-                <CardTitle>Security & Password Rules</CardTitle>
-                <CardDescription>Configure security settings and password policies</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <Label htmlFor="minLength">Minimum Password Length</Label>
-                      <Input
-                        id="minLength"
-                        type="number"
-                        value={securitySettings.minPasswordLength}
-                        onChange={(e) =>
-                          setSecuritySettings({
-                            ...securitySettings,
-                            minPasswordLength: e.target.value,
-                          })
-                        }
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="expiry">Password Expiry (days)</Label>
-                      <Input
-                        id="expiry"
-                        type="number"
-                        value={securitySettings.passwordExpiryDays}
-                        onChange={(e) =>
-                          setSecuritySettings({
-                            ...securitySettings,
-                            passwordExpiryDays: e.target.value,
-                          })
-                        }
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="timeout">Session Timeout (minutes)</Label>
-                      <Input
-                        id="timeout"
-                        type="number"
-                        value={securitySettings.sessionTimeoutMinutes}
-                        onChange={(e) =>
-                          setSecuritySettings({
-                            ...securitySettings,
-                            sessionTimeoutMinutes: e.target.value,
-                          })
-                        }
-                      />
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between p-4 border rounded-lg">
-                    <div>
-                      <p className="font-medium">Require Special Characters</p>
-                      <p className="text-sm text-gray-600">
-                        Passwords must contain at least one special character
-                      </p>
-                    </div>
-                    <Switch
-                      checked={securitySettings.requireSpecialChars}
-                      onCheckedChange={(checked) =>
-                        setSecuritySettings({
-                          ...securitySettings,
-                          requireSpecialChars: checked,
-                        })
-                      }
-                    />
-                  </div>
-                  <div className="pt-4">
-                    <Button onClick={handleSaveSecuritySettings}>Save Security Settings</Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-      </motion.div>
+            <div className="space-y-2">
+              <Label>Email (optional)</Label>
+              <Input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Role</Label>
+              <Select value={form.role} onValueChange={(v) => setForm({ ...form, role: v })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="2">Admin</SelectItem>
+                  <SelectItem value="3">Staff</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Password</Label>
+              <Input
+                type="password"
+                value={form.password}
+                onChange={(e) => setForm({ ...form, password: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={closeDialog}>
+              Cancel
+            </Button>
+            <Button onClick={handleCreateUser}>Create</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -22,14 +22,19 @@ import { SMSLogsPage } from '@/app/pages/SMSLogsPage';
 import { SettingsPage } from '@/app/pages/SettingsPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated } = useAuth();
-  
+  const { isAuthenticated, isInitializing } = useAuth();
+
+  if (isInitializing) {
+    return <div className="p-6">Loading...</div>;
+  }
+
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
-  
+
   return <>{children}</>;
 }
+
 
 function AppRoutes() {
   const { isAuthenticated } = useAuth();

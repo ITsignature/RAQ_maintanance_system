@@ -15,23 +15,22 @@ export function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setIsLoading(true);
 
-    // Simulate API call delay
-    setTimeout(() => {
-      const success = login(phoneNumber, password);
-      setIsLoading(false);
+  const success = await login(phoneNumber, password);
 
-      if (success) {
-        toast.success('Login successful');
-        navigate('/');
-      } else {
-        toast.error('Invalid phone number or password');
-      }
-    }, 500);
-  };
+  setIsLoading(false);
+
+  if (success) {
+    toast.success("Login successful");
+    navigate("/");
+  } else {
+    toast.error("Invalid phone number or password");
+  }
+};
+
 
   return (
     <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
@@ -105,7 +104,7 @@ export function Login() {
               <Fish className="w-8 h-8 text-white" />
             </div>
           </motion.div>
-
+Alerts
           {/* Title */}
           <motion.h1
             className="text-3xl font-bold text-center text-white mb-8"
@@ -163,15 +162,13 @@ export function Login() {
               transition={{ delay: 0.6 }}
             >
               <label className="flex items-center gap-2 text-white/90 cursor-pointer">
-                <input
+                {/* <input
                   type="checkbox"
                   className="w-4 h-4 rounded border-white/30 bg-white/10 text-cyan-500 focus:ring-cyan-500 focus:ring-offset-0"
-                />
-                <span className="text-sm">Remember me</span>
+                /> */}
+                {/* <span className="text-sm">Remember me</span> */}
               </label>
-              <a href="#" className="text-white/90 hover:text-white transition-colors">
-                Forgot Password?
-              </a>
+            
             </motion.div>
 
             <motion.div
@@ -196,12 +193,7 @@ export function Login() {
             animate={{ opacity: 1 }}
             transition={{ delay: 0.8 }}
           >
-            <p className="text-sm">
-              Don't have an account?{' '}
-              <a href="#" className="font-semibold text-white hover:text-cyan-300 transition-colors">
-                Register
-              </a>
-            </p>
+           
           </motion.div>
 
           {/* Demo Credentials */}
@@ -213,7 +205,7 @@ export function Login() {
           >
             <p className="font-semibold text-white/90 mb-2">Demo Credentials:</p>
             <div className="space-y-1 text-white/80">
-              <p className="font-mono">Phone: <span className="font-semibold text-cyan-300">1234567890</span></p>
+              <p className="font-mono">Phone: <span className="font-semibold text-cyan-300">0772222222</span></p>
               <p className="font-mono">Password: <span className="font-semibold text-cyan-300">admin123</span></p>
             </div>
           </motion.div>
