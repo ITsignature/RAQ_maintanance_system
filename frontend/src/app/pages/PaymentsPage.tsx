@@ -42,6 +42,8 @@ import {
 } from '@/app/components/ui/dropdown-menu';
 import { toast } from 'sonner';
 import { motion } from 'motion/react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 type Payment = {
   id: number;
@@ -241,265 +243,89 @@ export function PaymentsPage() {
     return `${formatDate(startDate)} - ${formatDate(endDate)}`;
   };
 
-  // Export to CSV
-  const exportToCSV = () => {
-    try {
-      const headers = [
-        'Payment ID',
-        'Date & Time',
-        'Customer Name',
-        'Customer Phone',
-        'Service',
-        'Booking ID',
-        'Payment Method',
-        'Reference No',
-        'Amount (LKR)',
-        'Payment Status',
-        'Note'
-      ];
+ 
 
-      const csvData = filteredPayments.map(payment => [
-        payment.id,
-        formatDateTime(payment.paid_at),
-        payment.customer_name || '',
-        payment.customer_phone || '',
-        payment.service_name,
-        payment.booking_id,
-        payment.method || 'N/A',
-        payment.reference_no || '',
-        parseFloat(payment.amount).toFixed(2),
-        payment.payment_status,
-        payment.note || ''
-      ]);
+const exportToPDF = () => {
+  if (filteredPayments.length === 0) {
+    toast.error('No payments to export');
+    return;
+  }
 
-      // Add statistics at the end
-      csvData.push([]);
-      csvData.push(['Statistics']);
-      csvData.push(['Total Payments', statistics.totalPayments]);
-      csvData.push(['Total Amount (LKR)', statistics.totalAmount.toFixed(2)]);
-      csvData.push(['Date Range', getDateRangeDisplay()]);
+  const doc = new jsPDF({
+    orientation: 'landscape', // better for tables
+  });
 
-      const csvContent = [
-        headers.join(','),
-        ...csvData.map(row => 
-          row.map(cell => {
-            const cellStr = String(cell);
-            // Escape quotes and wrap in quotes if contains comma or quote
-            if (cellStr.includes(',') || cellStr.includes('"') || cellStr.includes('\n')) {
-              return `"${cellStr.replace(/"/g, '""')}"`;
-            }
-            return cellStr;
-          }).join(',')
-        )
-      ].join('\n');
+  // Title
+  doc.setFontSize(16);
+  doc.text('Payments Report', 14, 15);
 
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement('a');
-      const url = URL.createObjectURL(blob);
-      link.setAttribute('href', url);
-      link.setAttribute('download', `payments_${startDate}_to_${endDate}.csv`);
-      link.style.visibility = 'hidden';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      toast.success('CSV exported successfully');
-    } catch (error) {
-      console.error('Export error:', error);
-      toast.error('Failed to export CSV');
-    }
-  };
+  // Subtitle
+  doc.setFontSize(10);
+  doc.text(
+    `Date Range: ${getDateRangeDisplay()} | Generated: ${new Date().toLocaleString()}`,
+    14,
+    22
+  );
 
-  // Export to PDF
-  const exportToPDF = () => {
-    try {
-      const printWindow = window.open('', '_blank');
-      if (!printWindow) {
-        toast.error('Please allow popups to export PDF');
-        return;
-      }
+  const tableData = filteredPayments.map((p, index) => [
+    index + 1,
+    `#${p.id}`,
+    formatDateTime(p.paid_at),
+    p.customer_name || '-',
+    p.customer_phone || '-',
+    p.service_name,
+    p.method || 'N/A',
+    p.reference_no || '-',
+    formatCurrency(p.amount),
+    p.note || '-',
+  ]);
 
-      const html = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>Payment Report - ${getDateRangeDisplay()}</title>
-          <style>
-            body {
-              font-family: Arial, sans-serif;
-              padding: 20px;
-              color: #333;
-            }
-            .header {
-              text-align: center;
-              margin-bottom: 30px;
-              border-bottom: 2px solid #333;
-              padding-bottom: 20px;
-            }
-            .header h1 {
-              margin: 0;
-              font-size: 24px;
-            }
-            .header p {
-              margin: 5px 0;
-              color: #666;
-            }
-            .statistics {
-              display: grid;
-              grid-template-columns: repeat(2, 1fr);
-              gap: 15px;
-              margin-bottom: 30px;
-              padding: 20px;
-              background: #f5f5f5;
-              border-radius: 8px;
-            }
-            .stat-item {
-              padding: 10px;
-            }
-            .stat-label {
-              font-size: 12px;
-              color: #666;
-              text-transform: uppercase;
-            }
-            .stat-value {
-              font-size: 20px;
-              font-weight: bold;
-              margin-top: 5px;
-            }
-            table {
-              width: 100%;
-              border-collapse: collapse;
-              margin-top: 20px;
-            }
-            th, td {
-              border: 1px solid #ddd;
-              padding: 10px;
-              text-align: left;
-              font-size: 12px;
-            }
-            th {
-              background-color: #333;
-              color: white;
-              font-weight: bold;
-            }
-            tr:nth-child(even) {
-              background-color: #f9f9f9;
-            }
-            .amount {
-              text-align: right;
-              font-weight: bold;
-            }
-            .badge {
-              display: inline-block;
-              padding: 4px 8px;
-              border-radius: 4px;
-              font-size: 11px;
-              font-weight: bold;
-            }
-            .badge-cash { background: #dcfce7; color: #166534; }
-            .badge-card { background: #dbeafe; color: #1e40af; }
-            .badge-online { background: #f3e8ff; color: #6b21a8; }
-            .badge-other { background: #f3f4f6; color: #374151; }
-            .footer {
-              margin-top: 30px;
-              text-align: center;
-              font-size: 11px;
-              color: #666;
-              border-top: 1px solid #ddd;
-              padding-top: 20px;
-            }
-            @media print {
-              body { padding: 0; }
-              .no-print { display: none; }
-            }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <h1>Payment Report</h1>
-            <p>${getDateRangeDisplay()}</p>
-            <p>Generated on ${new Date().toLocaleString()}</p>
-          </div>
+  autoTable(doc, {
+    startY: 28,
+    head: [[
+      '#',
+      'Payment ID',
+      'Date & Time',
+      'Customer',
+      'Phone',
+      'Service',
+      'Method',
+      'Reference',
+      'Amount',
+      'Note',
+    ]],
+    body: tableData,
+    styles: {
+      fontSize: 8,
+      cellPadding: 3,
+      overflow: 'linebreak',
+    },
+    headStyles: {
+      fillColor: [30, 64, 175], // blue header
+      textColor: 255,
+      fontStyle: 'bold',
+    },
+    alternateRowStyles: {
+      fillColor: [245, 247, 250],
+    },
+    columnStyles: {
+      0: { cellWidth: 8 },
+      1: { cellWidth: 20 },
+      2: { cellWidth: 30 },
+      3: { cellWidth: 30 },
+      4: { cellWidth: 25 },
+      5: { cellWidth: 35 },
+      6: { cellWidth: 20 },
+      7: { cellWidth: 30 },
+      8: { cellWidth: 25 },
+      9: { cellWidth: 40 },
+    },
+  });
 
-          <div class="statistics">
-            <div class="stat-item">
-              <div class="stat-label">Total Payments</div>
-              <div class="stat-value">${statistics.totalPayments}</div>
-            </div>
-            <div class="stat-item">
-              <div class="stat-label">Total Amount</div>
-              <div class="stat-value">${formatCurrency(statistics.totalAmount)}</div>
-            </div>
-            <div class="stat-item">
-              <div class="stat-label">Today's Payments</div>
-              <div class="stat-value">${statistics.todayPayments}</div>
-            </div>
-            <div class="stat-item">
-              <div class="stat-label">Today's Amount</div>
-              <div class="stat-value">${formatCurrency(statistics.todayAmount)}</div>
-            </div>
-          </div>
+  doc.save(`payments-${startDate}-to-${endDate}.pdf`);
+};
 
-          <table>
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Date & Time</th>
-                <th>Customer</th>
-                <th>Service</th>
-                <th>Method</th>
-                <th>Reference</th>
-                <th>Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${filteredPayments.map(payment => `
-                <tr>
-                  <td>#${payment.id}</td>
-                  <td>${formatDateTime(payment.paid_at)}</td>
-                  <td>
-                    <strong>${payment.customer_name || 'N/A'}</strong><br>
-                    <small>${payment.customer_phone || ''}</small>
-                  </td>
-                  <td>
-                    ${payment.service_name}<br>
-                    <small>Booking #${payment.booking_id}</small>
-                  </td>
-                  <td>
-                    <span class="badge badge-${(payment.method || 'other').toLowerCase().replace(' ', '-')}">
-                      ${payment.method || 'N/A'}
-                    </span>
-                  </td>
-                  <td>${payment.reference_no || '-'}</td>
-                  <td class="amount">${formatCurrency(payment.amount)}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
 
-          <div class="footer">
-            <p>This is a computer-generated report. Total records: ${filteredPayments.length}</p>
-          </div>
-
-          <div class="no-print" style="margin-top: 20px; text-align: center;">
-            <button onclick="window.print()" style="padding: 10px 20px; background: #333; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">
-              Print / Save as PDF
-            </button>
-            <button onclick="window.close()" style="padding: 10px 20px; background: #666; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; margin-left: 10px;">
-              Close
-            </button>
-          </div>
-        </body>
-        </html>
-      `;
-
-      printWindow.document.write(html);
-      printWindow.document.close();
-      toast.success('PDF preview opened');
-    } catch (error) {
-      console.error('Export error:', error);
-      toast.error('Failed to export PDF');
-    }
-  };
 
   return (
     <div className="p-2 md:p-1 lg:p-1 space-y-6 flex-1">
@@ -511,22 +337,14 @@ export function PaymentsPage() {
           </p>
         </div>
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline">
-              <Download className="h-4 w-4 mr-2" />
-              Export
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={exportToCSV}>
-              <FileSpreadsheet className="h-4 w-4 mr-2" />
-              Export as CSV
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={exportToPDF}>
-              <FileText className="h-4 w-4 mr-2" />
-              Export as PDF
-            </DropdownMenuItem>
-          </DropdownMenuContent>
+       <Button
+         variant="outline"
+         onClick={exportToPDF}
+         className="w-full sm:w-auto"
+       >
+         Export PDF
+       </Button>
+
         </DropdownMenu>
       </div>
 

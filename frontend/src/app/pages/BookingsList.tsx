@@ -23,6 +23,10 @@ import {
 import { Plus, Search, Eye, Edit2, Trash2, Calendar, Clock, DollarSign, User, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion } from 'motion/react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+
+
 
 type Booking = {
   id: number;
@@ -68,13 +72,19 @@ export function BookingsList() {
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
 
+  const today = new Date().toISOString().split('T')[0];
+
+  const [fromDate, setFromDate] = useState<string>(today);
+  const [toDate, setToDate] = useState<string>(today);
+ 
+
   // Fetch bookings from API
   const fetchBookings = async () => {
     try {
       setLoading(true);
       let url = `/api/bookings?page=${page}`;
-      if (dateFilter) {
-        url += `&date=${dateFilter}`;
+      if (fromDate && toDate) {
+        url += `&from=${fromDate}&to=${toDate}`;
       }
 
       const res = await apiFetch(url);
@@ -140,8 +150,8 @@ export function BookingsList() {
 
   // Load bookings on mount and when page/date changes
   useEffect(() => {
-    fetchBookings();
-  }, [page, dateFilter]);
+  fetchBookings();
+  }, [page, fromDate, toDate]);
 
   // Load customers after bookings are fetched
   useEffect(() => {
@@ -233,6 +243,47 @@ export function BookingsList() {
     setPage(1);
   };
 
+  const exportToPDF = () => {
+  const doc = new jsPDF();
+
+  doc.setFontSize(16);
+  doc.text('Bookings Report', 14, 15);
+
+  doc.setFontSize(10);
+  doc.text(`From: ${fromDate}  To: ${toDate}`, 14, 22);
+
+  const tableData = filteredBookings.map((b) => {
+    const customer = getCustomerById(b.customer_id);
+    return [
+      formatDate(b.booking_date),
+      customer?.name || '',
+      customer?.phone_no || '',
+      b.service_name,
+      b.status,
+      b.payment_status,
+      formatCurrency(b.service_amount),
+    ];
+  });
+
+  autoTable(doc, {
+    startY: 28,
+    head: [[
+      'Date',
+      'Customer',
+      'Phone',
+      'Service',
+      'Status',
+      'Payment',
+      'Amount'
+    ]],
+    body: tableData,
+    styles: { fontSize: 9 },
+    headStyles: { fillColor: [37, 99, 235] },
+  });
+
+  doc.save(`bookings_${fromDate}_to_${toDate}.pdf`);
+};
+
   return (
     <motion.div
       className="flex-1 mx-auto p-2 md:p-2 lg:p-2 space-y-6"
@@ -255,65 +306,94 @@ export function BookingsList() {
             Manage all maintenance bookings ({total} total)
           </p>
         </div>
+        
+        
         <Link to="/bookings/new" className="w-full sm:w-auto">
+        
           <Button className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-blue-500 shadow-lg hover:shadow-xl transition-all">
             <Plus className="w-4 h-4 mr-2" />
             New Booking
           </Button>
         </Link>
+        
       </motion.div>
 
       {/* Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base md:text-lg">Filters</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4 md:space-y-0 md:grid md:grid-cols-3 md:gap-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <Input
-                placeholder="Search by customer, phone, or service..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
+<Card>
+  <CardHeader>
+    <CardTitle className="text-base md:text-lg">Filters</CardTitle>
+  </CardHeader>
 
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="confirmed">Confirmed</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
-                <SelectItem value="cancelled">Cancelled</SelectItem>
-              </SelectContent>
-            </Select>
+  <CardContent>
+    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+      
+      {/* Search */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+        <Input
+          placeholder="Search by customer, phone, or service..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="pl-10"
+        />
+      </div>
 
-            <div className="relative">
-              <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <Input
-                type="date"
-                value={dateFilter}
-                onChange={handleDateFilterChange}
-                className="pl-10"
-                placeholder="Filter by date"
-              />
-              {dateFilter && (
-                <button
-                  onClick={clearDateFilter}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                >
-                  ✕
-                </button>
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Status */}
+      <Select value={statusFilter} onValueChange={setStatusFilter}>
+        <SelectTrigger>
+          <SelectValue placeholder="Filter by status" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">All Statuses</SelectItem>
+          <SelectItem value="pending">Pending</SelectItem>
+          <SelectItem value="confirmed">Confirmed</SelectItem>
+          <SelectItem value="completed">Completed</SelectItem>
+          <SelectItem value="cancelled">Cancelled</SelectItem>
+        </SelectContent>
+      </Select>
+
+      {/* Date range */}
+      <div className="grid grid-cols-2 gap-2">
+        <div className="relative">
+          <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+          <Input
+            type="date"
+            value={fromDate}
+            onChange={(e) => {
+              setFromDate(e.target.value);
+              setPage(1);
+            }}
+            className="pl-10"
+          />
+        </div>
+
+        <div className="relative">
+          <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+          <Input
+            type="date"
+            value={toDate}
+            onChange={(e) => {
+              setToDate(e.target.value);
+              setPage(1);
+            }}
+            className="pl-10"
+          />
+        </div>
+      </div>
+
+      {/* Export */}
+      <Button
+        variant="outline"
+        onClick={exportToPDF}
+        className="w-full"
+      >
+        Export PDF
+      </Button>
+
+    </div>
+  </CardContent>
+</Card>
+
 
       {/* Bookings Table/Cards */}
       <Card>
@@ -525,3 +605,4 @@ export function BookingsList() {
     </motion.div>
   );
 }
+

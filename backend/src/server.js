@@ -52,6 +52,7 @@ const usersRoutes = require("./users/routes");
 const bookingsRoutes = require("./bookings/routes");
 const paymentsRoutes = require("./payments/routes");
 const invoicesRoutes = require("./invoices/routes");
+const smsRoutes = require("./sms/routes");
 const { requireAuth, requireRole } = require("./auth/middleware");
 
 // Health check
@@ -63,7 +64,7 @@ app.use("/api/users", usersRoutes);
 app.use("/api/bookings", bookingsRoutes);
 app.use("/api/payments", paymentsRoutes);
 app.use("/api/invoices", invoicesRoutes);
-
+app.use('/api/sms', smsRoutes);
 // Protected routes examples
 app.get("/api/admin/only", requireAuth, requireRole(1, 2), (req, res) => {
   res.json({ message: "Hello staff!", user: req.user });

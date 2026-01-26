@@ -104,7 +104,6 @@ const handleSubmit = async (e: React.FormEvent) => {
               <Fish className="w-8 h-8 text-white" />
             </div>
           </motion.div>
-Alerts
           {/* Title */}
           <motion.h1
             className="text-3xl font-bold text-center text-white mb-8"

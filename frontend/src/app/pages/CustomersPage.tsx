@@ -30,6 +30,9 @@ import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+
 
 type Customer = {
   id: number;
@@ -192,6 +195,66 @@ export function CustomersPage() {
     );
   }
 
+  const exportToPDF = () => {
+  if (filteredCustomers.length === 0) {
+    toast.error('No customers to export');
+    return;
+  }
+
+  const doc = new jsPDF();
+
+  // Title
+  doc.setFontSize(16);
+  doc.text('Customers Report', 14, 15);
+
+  // Subtitle
+  doc.setFontSize(10);
+  doc.text(
+    `Generated on: ${format(new Date(), 'MMM dd, yyyy HH:mm')}`,
+    14,
+    22
+  );
+
+  // Table data
+  const tableData = filteredCustomers.map((c, index) => [
+    index + 1,
+    c.name,
+    c.phone_no,
+    c.email || '-',
+    c.loyalty_number || '-',
+    c.total_bookings || 0,
+    c.last_booking_date ? formatDate(c.last_booking_date) : 'Never',
+  ]);
+
+  autoTable(doc, {
+    startY: 28,
+    head: [[
+      '#',
+      'Name',
+      'Phone',
+      'Email',
+      'Loyalty No',
+      'Total Bookings',
+      'Last Booking'
+    ]],
+    body: tableData,
+    styles: {
+      fontSize: 9,
+      cellPadding: 3,
+    },
+    headStyles: {
+      fillColor: [30, 64, 175], // blue-ish
+      textColor: 255,
+      fontStyle: 'bold',
+    },
+    alternateRowStyles: {
+      fillColor: [245, 247, 250],
+    },
+  });
+
+  doc.save(`customers-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+};
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -207,12 +270,23 @@ export function CustomersPage() {
             Manage your customer database
           </p>
         </div>
-        <Link to="/customers/new" className="w-full sm:w-auto">
-          <Button className="w-full sm:w-auto">
-            <Plus className="w-4 h-4 mr-2" />
-            Add Customer
-          </Button>
-        </Link>
+      <div className="flex gap-2 w-full sm:w-auto">
+  <Button
+    variant="outline"
+    onClick={exportToPDF}
+    className="w-full sm:w-auto"
+  >
+    Export PDF
+  </Button>
+
+  <Link to="/customers/new" className="w-full sm:w-auto">
+    <Button className="w-full sm:w-auto">
+      <Plus className="w-4 h-4 mr-2" />
+      Add Customer
+    </Button>
+  </Link>
+</div>
+
       </div>
 
       {/* Filters */}

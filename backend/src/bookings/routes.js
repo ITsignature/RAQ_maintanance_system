@@ -156,22 +156,26 @@ router.get(
   requireAuth,
   requireRole(1, 2, 3),
   asyncHandler(async (req, res) => {
-    const { page = 1, date } = req.query;
+    const { page = 1, from, to } = req.query;
+
     const perPage = 50;
     const offset = (page - 1) * perPage;
 
-    let whereClause = 'WHERE is_active=TRUE';
+    let whereClause = 'WHERE is_active = TRUE';
+    const params = []; // ✅ FIX: initialize params
 
-    // Apply date filter if provided
-    if (date) {
-      whereClause += ` AND DATE(booking_date) = '${date}'`;
+    // Apply date range filter
+    if (from && to) {
+      whereClause += ' AND DATE(booking_date) BETWEEN ? AND ?';
+      params.push(from, to);
     }
 
-    // ⭐ FIX: Use DATE_FORMAT to return clean YYYY-MM-DD string without timezone
+    // Fetch paginated bookings
     const [rows] = await pool.query(
-      `SELECT 
+      `
+      SELECT 
         id,
-        DATE_FORMAT(booking_date, '%Y-%m-%d') as booking_date,
+        DATE_FORMAT(booking_date, '%Y-%m-%d') AS booking_date,
         start_time,
         end_time,
         customer_id,
@@ -184,16 +188,20 @@ router.get(
         created_by,
         created_at,
         updated_at
-       FROM bookings 
-       ${whereClause} 
-       ORDER BY booking_date DESC, start_time DESC 
-       LIMIT ? OFFSET ?`,
-      [perPage, offset]
+      FROM bookings
+      ${whereClause}
+      ORDER BY booking_date DESC, start_time DESC
+      LIMIT ? OFFSET ?
+      `,
+      [...params, perPage, offset]
     );
 
+    // Count total
     const [totalRows] = await pool.query(
-      `SELECT COUNT(*) AS total FROM bookings ${whereClause}`
+      `SELECT COUNT(*) AS total FROM bookings ${whereClause}`,
+      params
     );
+
     const totalBookings = totalRows[0]?.total || 0;
 
     res.json({
@@ -204,6 +212,7 @@ router.get(
     });
   })
 );
+
 
 // Edit booking
 router.patch(
