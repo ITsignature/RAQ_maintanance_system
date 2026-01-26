@@ -330,11 +330,11 @@ router.get("/customers/:id/details", requireAuth, requireRole(1, 2, 3), async (r
     // ✅ FIX: Properly sum all bookings with explicit 0 initial value
     const totalSpent = bookings.reduce((sum, b) => {
       return sum + parseFloat(b.service_amount);
-    }, 0); // ← This 0 is CRITICAL!
+    }, 0); //
     
     const totalPaid = bookings.reduce((sum, b) => {
       return sum + parseFloat(b.paid_amount);
-    }, 0); // ← This 0 is CRITICAL!
+    }, 0); //
     
     const outstandingBalance = totalSpent - totalPaid;
 

@@ -7,28 +7,21 @@ const { createBookingWithStaff } = require("./service");
 
 const router = express.Router();
 
-// Inline validation schemas
+// ============================================
+// VALIDATION SCHEMAS
+// ============================================
+
 const createBookingSchema = z.object({
   booking_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "booking_date must be YYYY-MM-DD"),
   start_time: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/, "start_time must be HH:mm or HH:mm:ss"),
   end_time: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/, "end_time must be HH:mm or HH:mm:ss"),
-
   customer_id: z.number().int().positive(),
   service_name: z.string().min(2).max(150),
   service_amount: z.number().nonnegative(),
   note: z.string().optional().nullable(),
-
   staff_ids: z.array(z.number().int().positive()).optional().default([]),
 });
 
-const statusSchema = z.object({
-  status: z.enum(["pending", "confirmed", "completed", "cancelled"]),
-});
-
-
-// ────────────────────────────────────────────────
-//               Reuseable partial schema
-// ────────────────────────────────────────────────
 const bookingUpdateSchema = z.object({
   customer_id: z.number().int().positive().optional(),
   booking_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
@@ -37,11 +30,9 @@ const bookingUpdateSchema = z.object({
   service_name: z.string().min(1).max(150).optional(),
   service_amount: z.number().nonnegative().optional(),
   note: z.union([z.string(), z.null()]).optional(),
-  status: z.enum(["Scheduled", "In Progress", "Completed", "Cancelled"]).optional(),
   staff_ids: z.array(z.number().int().positive()).optional(),
 }).refine(
   (data) => {
-    // If any time-related field is provided, require the others too
     const timeFields = [data.start_time, data.end_time, data.booking_date];
     const someTimeProvided = timeFields.some(Boolean);
     const allTimeProvided = timeFields.every(Boolean);
@@ -52,6 +43,15 @@ const bookingUpdateSchema = z.object({
     path: ["start_time"],
   }
 );
+
+const statusSchema = z.object({
+  status: z.enum(["pending", "confirmed", "completed", "cancelled"]),
+});
+
+// ============================================
+// ROUTES
+// ============================================
+
 // Create booking (+ assign staff)
 router.post(
   "/",
@@ -69,8 +69,7 @@ router.post(
       return res.status(400).json({ message: "end_time must be after start_time" });
     }
 
-    // 🔒 STAFF-SPECIFIC CONFLICT CHECK
-    // Only check for conflicts if staff members are assigned
+    // Staff-specific conflict check
     if (staff_ids && staff_ids.length > 0) {
       const [conflicts] = await pool.query(
         `SELECT DISTINCT
@@ -82,20 +81,14 @@ router.post(
          FROM bookings b
          JOIN booking_staff bs ON bs.booking_id = b.id
          JOIN users u ON u.id = bs.staff_id
-         WHERE b.booking_date = ?
+         WHERE DATE(b.booking_date) = ?
            AND b.is_active = TRUE
            AND bs.staff_id IN (?)
            AND (b.start_time < ? AND b.end_time > ?)`,
-        [
-          booking.booking_date,
-          staff_ids,
-          booking.end_time,
-          booking.start_time
-        ]
+        [booking.booking_date, staff_ids, booking.end_time, booking.start_time]
       );
 
       if (conflicts.length > 0) {
-        // Group conflicts by staff member
         const conflictDetails = conflicts.map(c => ({
           staff_id: c.staff_id,
           staff_name: c.staff_name,
@@ -110,7 +103,6 @@ router.post(
       }
     }
 
-    // No conflicts - proceed with booking creation
     const bookingId = await createBookingWithStaff({
       booking,
       staff_ids,
@@ -121,21 +113,42 @@ router.post(
   })
 );
 
-//Get booking by id
-router.get('/:id', requireAuth, requireRole(1, 2, 3), asyncHandler(async (req, res) => {
-  const bookingId = req.params.id;
-  const [rows] = await pool.query(
-    'SELECT * FROM bookings WHERE id = ? AND is_active = TRUE',
-    [bookingId]
-  );
-  
-  if (rows.length === 0) {
-    return res.status(404).json({ message: 'Booking not found' });
-  }
-  
-  res.json(rows[0]);
-}));
-
+// Get booking by id
+router.get(
+  '/:id',
+  requireAuth,
+  requireRole(1, 2, 3),
+  asyncHandler(async (req, res) => {
+    const bookingId = req.params.id;
+    
+    const [rows] = await pool.query(
+      `SELECT 
+        id,
+        DATE_FORMAT(booking_date, '%Y-%m-%d') as booking_date,
+        start_time,
+        end_time,
+        customer_id,
+        service_name,
+        service_amount,
+        note,
+        status,
+        payment_status,
+        is_active,
+        created_by,
+        created_at,
+        updated_at
+       FROM bookings 
+       WHERE id = ? AND is_active = TRUE`,
+      [bookingId]
+    );
+    
+    if (rows.length === 0) {
+      return res.status(404).json({ message: 'Booking not found' });
+    }
+    
+    res.json(rows[0]);
+  })
+);
 
 // List active bookings with pagination and date filter
 router.get(
@@ -143,23 +156,44 @@ router.get(
   requireAuth,
   requireRole(1, 2, 3),
   asyncHandler(async (req, res) => {
-    const { page = 1, date } = req.query; // Get page number from query
-    const perPage = 50; // 50 per page
+    const { page = 1, date } = req.query;
+    const perPage = 50;
     const offset = (page - 1) * perPage;
 
     let whereClause = 'WHERE is_active=TRUE';
 
     // Apply date filter if provided
     if (date) {
-      whereClause += ` AND booking_date LIKE '${date}%'`;
+      whereClause += ` AND DATE(booking_date) = '${date}'`;
     }
 
+    // ⭐ FIX: Use DATE_FORMAT to return clean YYYY-MM-DD string without timezone
     const [rows] = await pool.query(
-      `SELECT * FROM bookings ${whereClause} ORDER BY booking_date DESC, start_time DESC LIMIT ? OFFSET ?`,
+      `SELECT 
+        id,
+        DATE_FORMAT(booking_date, '%Y-%m-%d') as booking_date,
+        start_time,
+        end_time,
+        customer_id,
+        service_name,
+        service_amount,
+        note,
+        status,
+        payment_status,
+        is_active,
+        created_by,
+        created_at,
+        updated_at
+       FROM bookings 
+       ${whereClause} 
+       ORDER BY booking_date DESC, start_time DESC 
+       LIMIT ? OFFSET ?`,
       [perPage, offset]
     );
 
-    const [totalRows] = await pool.query(`SELECT COUNT(*) AS total FROM bookings ${whereClause}`);
+    const [totalRows] = await pool.query(
+      `SELECT COUNT(*) AS total FROM bookings ${whereClause}`
+    );
     const totalBookings = totalRows[0]?.total || 0;
 
     res.json({
@@ -171,6 +205,7 @@ router.get(
   })
 );
 
+// Edit booking
 router.patch(
   "/:id",
   requireAuth,
@@ -191,10 +226,10 @@ router.patch(
 
     const data = parsed.data;
 
-    // ─── 1. Optional: Conflict check if date/time is being changed ───────
+    // Conflict check if date/time is being changed
     if (data.booking_date || data.start_time || data.end_time) {
       const [[current]] = await pool.query(
-        "SELECT booking_date, start_time, end_time FROM bookings WHERE id = ? AND is_active = TRUE",
+        "SELECT DATE(booking_date) as booking_date, start_time, end_time FROM bookings WHERE id = ? AND is_active = TRUE",
         [bookingId]
       );
 
@@ -210,12 +245,11 @@ router.patch(
         return res.status(400).json({ message: "end_time must be after start_time" });
       }
 
-      // Get staff IDs - either new ones being assigned or existing ones
+      // Get staff IDs
       let staffIdsToCheck = [];
       if (data.staff_ids !== undefined) {
         staffIdsToCheck = data.staff_ids;
       } else {
-        // Get current staff assignments
         const [currentStaff] = await pool.query(
           "SELECT staff_id FROM booking_staff WHERE booking_id = ?",
           [bookingId]
@@ -223,7 +257,7 @@ router.patch(
         staffIdsToCheck = currentStaff.map(s => s.staff_id);
       }
 
-      // Only check conflicts if there are staff assigned
+      // Check conflicts if there are staff assigned
       if (staffIdsToCheck.length > 0) {
         const [conflicts] = await pool.query(
           `SELECT DISTINCT
@@ -237,7 +271,7 @@ router.patch(
            JOIN users u ON u.id = bs.staff_id
            WHERE b.id != ?
              AND b.is_active = TRUE
-             AND b.booking_date = ?
+             AND DATE(b.booking_date) = ?
              AND bs.staff_id IN (?)
              AND (b.start_time < ? AND b.end_time > ?)`,
           [bookingId, checkDate, staffIdsToCheck, checkEnd, checkStart]
@@ -259,11 +293,10 @@ router.patch(
       }
     }
 
-    // ─── 2. Handle staff reassignment conflict check (if only staff is changing) ───
+    // Handle staff reassignment conflict check
     if (data.staff_ids !== undefined && !data.booking_date && !data.start_time && !data.end_time) {
-      // Get current booking time
       const [[current]] = await pool.query(
-        "SELECT booking_date, start_time, end_time FROM bookings WHERE id = ? AND is_active = TRUE",
+        "SELECT DATE(booking_date) as booking_date, start_time, end_time FROM bookings WHERE id = ? AND is_active = TRUE",
         [bookingId]
       );
 
@@ -271,7 +304,6 @@ router.patch(
         return res.status(404).json({ message: "Booking not found or already deleted" });
       }
 
-      // Check if new staff have conflicts
       if (data.staff_ids.length > 0) {
         const [conflicts] = await pool.query(
           `SELECT DISTINCT
@@ -285,16 +317,10 @@ router.patch(
            JOIN users u ON u.id = bs.staff_id
            WHERE b.id != ?
              AND b.is_active = TRUE
-             AND b.booking_date = ?
+             AND DATE(b.booking_date) = ?
              AND bs.staff_id IN (?)
              AND (b.start_time < ? AND b.end_time > ?)`,
-          [
-            bookingId,
-            current.booking_date,
-            data.staff_ids,
-            current.end_time,
-            current.start_time
-          ]
+          [bookingId, current.booking_date, data.staff_ids, current.end_time, current.start_time]
         );
 
         if (conflicts.length > 0) {
@@ -313,7 +339,7 @@ router.patch(
       }
     }
 
-    // ─── 3. Build dynamic UPDATE query for booking table ─────────────────
+    // Build dynamic UPDATE query
     const updates = [];
     const values = [];
 
@@ -350,20 +376,17 @@ router.patch(
       values.push(data.status);
     }
 
-    // Always update timestamp
     updates.push("updated_at = NOW()");
 
     if (updates.length > 0) {
       values.push(bookingId);
       await pool.query(
-        `UPDATE bookings
-         SET ${updates.join(", ")}
-         WHERE id = ? AND is_active = TRUE`,
+        `UPDATE bookings SET ${updates.join(", ")} WHERE id = ? AND is_active = TRUE`,
         values
       );
     }
 
-    // ─── 4. Handle staff reassignment (replace all) ───────────────────────
+    // Handle staff reassignment
     if (data.staff_ids !== undefined) {
       await pool.query("DELETE FROM booking_staff WHERE booking_id = ?", [bookingId]);
 
@@ -376,7 +399,6 @@ router.patch(
       }
     }
 
-    // ─── 5. Return success ───────────────────────────────────────────────
     res.json({
       message: "Booking updated successfully",
       booking_id: bookingId,
@@ -402,7 +424,7 @@ router.patch(
   })
 );
 
-// Soft delete booking (admin/super)
+// Soft delete booking
 router.delete(
   "/:id",
   requireAuth,
@@ -410,40 +432,42 @@ router.delete(
   asyncHandler(async (req, res) => {
     const bookingId = req.params.id;
 
-    // Step 1: Check if there are any payments for this booking
+    // Check if there are any payments for this booking
     const [payments] = await pool.query(
       `SELECT id FROM payments WHERE booking_id=? AND is_active=TRUE`,
       [bookingId]
     );
 
     if (payments.length > 0) {
-      // Step 2: If payments exist, return a message to delete payments first
       return res.status(400).json({
         message: 'Please delete associated payments before deleting the booking.',
       });
     }
 
-    // Step 3: Perform the soft delete on the booking
     await pool.query(`UPDATE bookings SET is_active=FALSE WHERE id=?`, [bookingId]);
 
     res.json({ message: "Booking deleted (soft)" });
   })
 );
 
+// Get staff for a booking
+router.get(
+  '/:id/staff',
+  requireAuth,
+  requireRole(1, 2, 3),
+  asyncHandler(async (req, res) => {
+    const bookingId = req.params.id;
 
-// GET /api/bookings/:id/staff
-router.get('/:id/staff', requireAuth, requireRole(1, 2, 3), asyncHandler(async (req, res) => {
-  const bookingId = req.params.id;
+    const [rows] = await pool.query(
+      `SELECT u.id, u.name, u.phone_no
+       FROM users u
+       JOIN booking_staff bs ON u.id = bs.staff_id
+       WHERE bs.booking_id = ? AND u.is_active = 1`,
+      [bookingId]
+    );
 
-  const [rows] = await pool.query(
-    `SELECT u.id, u.name, u.phone_no
-     FROM users u
-     JOIN booking_staff bs ON u.id = bs.staff_id
-     WHERE bs.booking_id = ? AND u.is_active = 1`, [bookingId]
-  );
-
-  res.json(rows);
-}));
-
+    res.json(rows);
+  })
+);
 
 module.exports = router;

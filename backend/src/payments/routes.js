@@ -13,6 +13,7 @@ const createPaymentSchema = z.object({
   method: z.string().max(40).optional().nullable(),
   reference_no: z.string().max(100).optional().nullable(),
   note: z.string().optional().nullable(),
+  paid_at: z.string().optional().nullable(),
 });
 
 
@@ -33,7 +34,13 @@ router.post(
       });
     }
 
-    const { booking_id, amount, method, reference_no, note } = parsed.data;
+    const { booking_id, amount, method, reference_no, note,paid_at } = parsed.data;
+
+    console.log(paid_at);
+
+    const paidAtValue = paid_at ? new Date(paid_at) : new Date();
+
+    console.log(paidAtValue);
 
     // Ensure booking exists & active
     const [[bk]] = await pool.query(
@@ -44,9 +51,9 @@ router.post(
 
     await pool.query(
       `INSERT INTO payments
-       (booking_id, amount, method, reference_no, note, is_active, created_by)
-       VALUES (?, ?, ?, ?, ?, TRUE, ?)`,
-      [booking_id, amount, method ?? null, reference_no ?? null, note ?? null, req.user.id]
+       (booking_id, amount, method, reference_no, note, paid_at, is_active, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, TRUE, ?)`,
+      [booking_id, amount, method ?? null, reference_no ?? null, note ?? null,paidAtValue, req.user.id]
     );
 
     await recalcPaymentStatus(booking_id);
@@ -80,7 +87,7 @@ router.get(
         b.service_name, b.service_amount, b.payment_status
       FROM payments p
       JOIN bookings b ON b.id = p.booking_id
-      WHERE 1=1
+      WHERE p.is_active = TRUE
     `;
     const params = [];
 
@@ -129,22 +136,33 @@ router.delete(
 
 // GET /api/payments/overview
 // Returns all payment transactions with customer and booking info
+// GET /api/payments/overview
+// Returns all payment transactions with customer and booking info
 router.get(
   "/overview",
   requireAuth,
   requireRole(1, 2, 3),
   asyncHandler(async (req, res) => {
-    const { page = 1, date, method } = req.query;
+    const { page = 1, startDate, endDate, method } = req.query;
     const perPage = 50;
     const offset = (page - 1) * perPage;
 
     let whereClause = 'WHERE p.is_active = TRUE';
     const params = [];
 
-    // Apply date filter (filter by payment date, not booking date)
-    if (date) {
-      whereClause += ` AND DATE(p.paid_at) = ?`;
-      params.push(date);
+    // Apply date range filter (filter by payment date, not booking date)
+    if (startDate && endDate) {
+      // Filter for date range (inclusive of both dates)
+      whereClause += ` AND DATE(p.paid_at) BETWEEN ? AND ?`;
+      params.push(startDate, endDate);
+    } else if (startDate) {
+      // Only start date provided
+      whereClause += ` AND DATE(p.paid_at) >= ?`;
+      params.push(startDate);
+    } else if (endDate) {
+      // Only end date provided
+      whereClause += ` AND DATE(p.paid_at) <= ?`;
+      params.push(endDate);
     }
 
     // Apply payment method filter

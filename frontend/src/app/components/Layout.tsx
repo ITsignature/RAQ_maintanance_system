@@ -39,8 +39,8 @@ const navigation = [
   { name: "Bookings", href: "/bookings", icon: Clipboard },
   { name: "Customers", href: "/customers", icon: Users },
   { name: "Payments", href: "/payments", icon: CreditCard },
-  { name: "Reports", href: "/reports", icon: BarChart3 },
-  { name: "SMS Logs", href: "/sms-logs", icon: MessageSquare },
+  // { name: "Reports", href: "/reports", icon: BarChart3 },
+  { name: "SMS", href: "/sms-logs", icon: MessageSquare },
   { name: "Settings", href: "/settings", icon: Settings },
 ];
 

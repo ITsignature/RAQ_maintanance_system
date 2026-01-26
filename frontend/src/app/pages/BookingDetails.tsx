@@ -116,37 +116,13 @@ export function BookingDetails() {
   const [invoiceNo, setInvoiceNo] = useState('');
   const [uploading, setUploading] = useState(false);
 
-  // Fetch booking details
-// Fetch booking details including staff info
-// const fetchBooking = async () => {
-//   try {
-//     const res = await apiFetch(`/api/bookings/${id}`);
-//     if (!res.ok) throw new Error('Failed to fetch booking');
-
-//     const data = await res.json();
-//     console.log('📅 Booking data:', data);
-//     setBooking(data);
-//   } catch (error: any) {
-//     console.error('Error fetching booking:', error);
-//     toast.error(error.message || 'Failed to load booking');
-//   }
-// };
+  const [paidAt, setPaidAt] = useState(() => {
+  const d = new Date();
+  return d.toISOString().slice(0, 10); // "YYYY-MM-DD"
+});
 
 
-// const fetchStaff = async (bookingId: number) => {
-//   console.log('Fetching staff for booking ID:', bookingId);
-//   try {
-//     const res = await apiFetch(`/api/bookings/${bookingId}/staff`);
-//     if (!res.ok) throw new Error('Failed to fetch staff details');
-
-//     const data = await res.json();
-//     setStaff(data); // Set the staff data
-//   } catch (error: any) {
-//     console.error('Error fetching staff:', error);
-//     toast.error(error.message || 'Failed to load staff');
-//   }
-// };
-
+  
 // Fetch booking details
   const fetchBooking = async () => {
     try {
@@ -276,6 +252,7 @@ useEffect(() => {
           method: paymentMethod,
           reference_no: paymentReference || null,
           note: null,
+          paid_at: paidAt,
         }),
       });
 
@@ -731,10 +708,16 @@ useEffect(() => {
                     Completed
                   </Button>
                 )}
-                <Button variant="destructive" onClick={() => setIsDeleteDialogOpen(true)}>
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Cancel Booking
-                </Button>
+                {booking.status === 'completed' ? null : (
+                  <Button
+                    variant="destructive"
+                    onClick={() => setIsDeleteDialogOpen(true)}
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Cancel Booking
+                  </Button>
+                )}
+
               </div>
             </CardContent>
           </Card>
@@ -794,6 +777,16 @@ useEffect(() => {
                       <DialogTitle>Add Payment</DialogTitle>
                     </DialogHeader>
                     <div className="space-y-4">
+                      <div>
+                      <Label htmlFor="paidAt">Paid Date</Label>
+                      <Input
+                        id="paidAt"
+                        type="date"
+                        value={paidAt}
+                        onChange={(e) => setPaidAt(e.target.value)}
+                      />
+                    </div>
+
                       <div>
                         <Label htmlFor="amount">Payment Amount</Label>
                         <Input
@@ -974,7 +967,7 @@ useEffect(() => {
                             {invoice.invoice_no || `Invoice #${invoice.id}`}
                           </p>
                           <p className="text-xs text-gray-500 dark:text-gray-400">
-                            {formatDate(invoice.created_at)}
+                            {formatDate(invoice.issued_at)}
                             {invoice.created_by_name && ` • ${invoice.created_by_name}`}
                           </p>
                         </div>

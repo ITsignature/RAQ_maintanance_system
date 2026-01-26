@@ -20,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/app/components/ui/select';
-import { Plus, Search, Eye, Edit2, Trash2, Calendar } from 'lucide-react';
+import { Plus, Search, Eye, Edit2, Trash2, Calendar, Clock, DollarSign, User, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion } from 'motion/react';
 
@@ -206,13 +206,13 @@ export function BookingsList() {
 
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
-      pending: 'bg-yellow-100 text-yellow-800',
-      confirmed: 'bg-blue-100 text-blue-800',
-      completed: 'bg-green-100 text-green-800',
-      cancelled: 'bg-red-100 text-red-800',
-      paid: 'bg-green-100 text-green-800',
-      unpaid: 'bg-red-100 text-red-800',
-      partial: 'bg-yellow-100 text-yellow-800',
+      pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-950 dark:text-yellow-400',
+      confirmed: 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-400',
+      completed: 'bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-400',
+      cancelled: 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-400',
+      paid: 'bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-400',
+      unpaid: 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-400',
+      partial: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-950 dark:text-yellow-400',
     };
     return colors[status.toLowerCase()] || 'bg-gray-100 text-gray-800';
   };
@@ -235,28 +235,28 @@ export function BookingsList() {
 
   return (
     <motion.div
-      className="space-y-6"
+      className="flex-1 mx-auto p-2 md:p-2 lg:p-2 space-y-6"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.3 }}
     >
       {/* Header */}
       <motion.div
-        className="flex justify-between items-center"
+        className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4"
         initial={{ y: -20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.1 }}
       >
         <div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-blue-400 bg-clip-text text-transparent">
+          <h1 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-blue-600 to-blue-400 bg-clip-text text-transparent">
             Bookings
           </h1>
-          <p className="text-gray-600 mt-1">
+          <p className="text-gray-600 dark:text-gray-400 mt-1 text-sm md:text-base">
             Manage all maintenance bookings ({total} total)
           </p>
         </div>
-        <Link to="/bookings/new">
-          <Button className="bg-gradient-to-r from-blue-600 to-blue-500 shadow-lg hover:shadow-xl transition-all">
+        <Link to="/bookings/new" className="w-full sm:w-auto">
+          <Button className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-blue-500 shadow-lg hover:shadow-xl transition-all">
             <Plus className="w-4 h-4 mr-2" />
             New Booking
           </Button>
@@ -266,10 +266,10 @@ export function BookingsList() {
       {/* Filters */}
       <Card>
         <CardHeader>
-          <CardTitle>Filters</CardTitle>
+          <CardTitle className="text-base md:text-lg">Filters</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="space-y-4 md:space-y-0 md:grid md:grid-cols-3 md:gap-4">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
               <Input
@@ -315,86 +315,172 @@ export function BookingsList() {
         </CardContent>
       </Card>
 
-      {/* Bookings Table */}
+      {/* Bookings Table/Cards */}
       <Card>
         <CardContent className="p-0">
           {loading ? (
             <div className="text-center py-8 text-gray-500">Loading bookings...</div>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date & Time</TableHead>
-                    <TableHead>Customer</TableHead>
-                    <TableHead>Phone</TableHead>
-                    <TableHead>Service</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Payment</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredBookings.length === 0 ? (
+            <>
+              {/* Desktop Table View */}
+              <div className="hidden lg:block overflow-x-auto">
+                <Table>
+                  <TableHeader>
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center py-8 text-gray-500">
-                        No bookings found
-                      </TableCell>
+                      <TableHead>Date & Time</TableHead>
+                      <TableHead>Customer</TableHead>
+                      <TableHead>Phone</TableHead>
+                      <TableHead>Service</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Payment</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
-                  ) : (
-                    filteredBookings.map((booking) => {
-                      const customer = getCustomerById(booking.customer_id);
+                  </TableHeader>
+                  <TableBody>
+                    {filteredBookings.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={8} className="text-center py-8 text-gray-500">
+                          No bookings found
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      filteredBookings.map((booking) => {
+                        const customer = getCustomerById(booking.customer_id);
 
-                      return (
-                        <TableRow key={booking.id}>
-                          <TableCell>
-                            <div>
-                              <p className="font-medium">{formatDate(booking.booking_date)}</p>
-                              <p className="text-sm text-gray-600">
-                                {booking.start_time.substring(0, 5)} - {booking.end_time.substring(0, 5)}
+                        return (
+                          <TableRow key={booking.id}>
+                            <TableCell>
+                              <div>
+                                <p className="font-medium">{formatDate(booking.booking_date)}</p>
+                                <p className="text-sm text-gray-600">
+                                  {booking.start_time.substring(0, 5)} - {booking.end_time.substring(0, 5)}
+                                </p>
+                              </div>
+                            </TableCell>
+                            <TableCell>{customer?.name || 'Loading...'}</TableCell>
+                            <TableCell>{customer?.phone_no || 'N/A'}</TableCell>
+                            <TableCell>{booking.service_name}</TableCell>
+                            <TableCell>
+                              <Badge className={getStatusColor(booking.status)}>{booking.status}</Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Badge className={getStatusColor(booking.payment_status)}>{booking.payment_status}</Badge>
+                            </TableCell>
+                            <TableCell className="text-right">{formatCurrency(booking.service_amount)}</TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end gap-2">
+                                <Link to={`/bookings/${booking.id}`}>
+                                  <Button size="sm" variant="ghost">
+                                    <Eye className="w-4 h-4" />
+                                  </Button>
+                                </Link>
+                                <Link to={`/bookings/${booking.id}/edit`}>
+                                  <Button size="sm" variant="ghost">
+                                    <Edit2 className="w-4 h-4" />
+                                  </Button>
+                                </Link>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Mobile Card View */}
+              <div className="lg:hidden p-4 space-y-4">
+                {filteredBookings.length === 0 ? (
+                  <div className="text-center py-12 text-gray-500">
+                    No bookings found
+                  </div>
+                ) : (
+                  filteredBookings.map((booking) => {
+                    const customer = getCustomerById(booking.customer_id);
+
+                    return (
+                      <motion.div
+                        key={booking.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="border rounded-lg p-4 space-y-3 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
+                      >
+                        {/* Header with Date and Status */}
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                            <Calendar className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                            <div className="min-w-0">
+                              <p className="font-semibold text-sm md:text-base truncate">
+                                {formatDate(booking.booking_date)}
                               </p>
+                              <div className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400">
+                                <Clock className="w-3 h-3" />
+                                <span>
+                                  {booking.start_time.substring(0, 5)} - {booking.end_time.substring(0, 5)}
+                                </span>
+                              </div>
                             </div>
-                          </TableCell>
-                          <TableCell>{customer?.name || 'Loading...'}</TableCell>
-                          <TableCell>{customer?.phone_no || 'N/A'}</TableCell>
-                          <TableCell>{booking.service_name}</TableCell>
-                          <TableCell>
-                            <Badge className={getStatusColor(booking.status)}>{booking.status}</Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Badge className={getStatusColor(booking.payment_status)}>{booking.payment_status}</Badge>
-                          </TableCell>
-                          <TableCell className="text-right">{formatCurrency(booking.service_amount)}</TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end gap-2">
-                              <Link to={`/bookings/${booking.id}`}>
-                                <Button size="sm" variant="ghost">
-                                  <Eye className="w-4 h-4" />
-                                </Button>
-                              </Link>
-                              <Link to={`/bookings/${booking.id}/edit`}>
-                                <Button size="sm" variant="ghost">
-                                  <Edit2 className="w-4 h-4" />
-                                </Button>
-                              </Link>
-                              {/* <Button 
-                                size="sm" 
-                                variant="ghost" 
-                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                onClick={() => handleDelete(booking.id)}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button> */}
+                          </div>
+                          <Badge className={`${getStatusColor(booking.status)} text-xs flex-shrink-0`}>
+                            {booking.status}
+                          </Badge>
+                        </div>
+
+                        {/* Customer Info */}
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <User className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                            <div className="min-w-0 flex-1">
+                              <p className="font-medium text-sm truncate">{customer?.name || 'Loading...'}</p>
+                              <p className="text-xs text-gray-600 dark:text-gray-400">{customer?.phone_no || 'N/A'}</p>
                             </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })
-                  )}
-                </TableBody>
-              </Table>
-            </div>
+                          </div>
+                        </div>
+
+                        {/* Service and Amount */}
+                        <div className="flex items-center justify-between pt-2 border-t">
+                          <div className="min-w-0 flex-1 mr-2">
+                            <p className="text-xs text-gray-600 dark:text-gray-400">Service</p>
+                            <p className="font-medium text-sm truncate">{booking.service_name}</p>
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            <p className="text-xs text-gray-600 dark:text-gray-400">Amount</p>
+                            <p className="font-bold text-sm">{formatCurrency(booking.service_amount)}</p>
+                          </div>
+                        </div>
+
+                        {/* Payment Status */}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <DollarSign className="w-4 h-4 text-gray-400" />
+                            <Badge className={`${getStatusColor(booking.payment_status)} text-xs`}>
+                              {booking.payment_status}
+                            </Badge>
+                          </div>
+
+                          {/* Actions */}
+                          <div className="flex gap-2">
+                            <Link to={`/bookings/${booking.id}`}>
+                              <Button size="sm" variant="outline" className="h-8">
+                                <Eye className="w-3 h-3 mr-1" />
+                                <span className="text-xs">View</span>
+                              </Button>
+                            </Link>
+                            <Link to={`/bookings/${booking.id}/edit`}>
+                              <Button size="sm" variant="outline" className="h-8">
+                                <Edit2 className="w-3 h-3" />
+                              </Button>
+                            </Link>
+                          </div>
+                        </div>
+                      </motion.div>
+                    );
+                  })
+                )}
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
@@ -403,17 +489,19 @@ export function BookingsList() {
       {!loading && totalPages > 1 && (
         <Card>
           <CardContent className="py-4">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
               <Button 
                 variant="outline" 
                 onClick={() => handlePageChange(page - 1)} 
                 disabled={page === 1}
+                className="w-full sm:w-auto"
               >
+                <ChevronLeft className="w-4 h-4 mr-2" />
                 Previous
               </Button>
               
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-600">
+              <div className="flex flex-col sm:flex-row items-center gap-2 text-center">
+                <span className="text-sm text-gray-600 dark:text-gray-400">
                   Page {page} of {totalPages}
                 </span>
                 <span className="text-sm text-gray-400">
@@ -425,8 +513,10 @@ export function BookingsList() {
                 variant="outline" 
                 onClick={() => handlePageChange(page + 1)} 
                 disabled={page === totalPages}
+                className="w-full sm:w-auto"
               >
                 Next
+                <ChevronRight className="w-4 h-4 ml-2" />
               </Button>
             </div>
           </CardContent>
