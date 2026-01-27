@@ -414,7 +414,7 @@ useEffect(() => {
       const contentDisposition = res.headers.get('Content-Disposition');
       let filename = `invoice-${invoiceId}`;
       if (contentDisposition) {
-        const match = contentDisposition.match(/filename="?(.+)"?/);
+        const match = contentDisposition.match(/filename="([^"]+)"/);
         if (match) filename = match[1];
       }
 
