@@ -12,7 +12,7 @@ function cookieOptions() {
     httpOnly: true,
     secure: process.env.COOKIE_SECURE === "true",
     sameSite: "lax",
-    path: "/api/auth/refresh",
+    path: "/auth/refresh",
     domain: process.env.COOKIE_DOMAIN || undefined,
   };
 }
