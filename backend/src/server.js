@@ -30,7 +30,7 @@ app.use(cookieParser());
 // If frontend is separate domain, enable CORS with credentials:
 app.use(
   cors({
-     origin: ["https://maintenance.royalaquarium.lk"], // change to your frontend
+     origin: ["https://maintenance.royalaquarium.lk","http://localhost:5173"], // change to your frontend
     credentials: true,
   })
 );
@@ -55,6 +55,7 @@ const paymentsRoutes = require("./payments/routes");
 const invoicesRoutes = require("./invoices/routes");
 const smsRoutes = require("./sms/routes");
 const { requireAuth, requireRole } = require("./auth/middleware");
+const dashboardRoutes = require("./dashboard/routes");
 
 // Health check
 app.get("/health", (req, res) => res.json({ ok: true }));
@@ -66,6 +67,7 @@ app.use("/api/bookings", bookingsRoutes);
 app.use("/api/payments", paymentsRoutes);
 app.use("/api/invoices", invoicesRoutes);
 app.use('/api/sms', smsRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 // Protected routes examples
 app.get("/api/admin/only", requireAuth, requireRole(1, 2), (req, res) => {
   res.json({ message: "Hello staff!", user: req.user });

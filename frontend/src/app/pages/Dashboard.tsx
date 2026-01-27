@@ -8,142 +8,81 @@ import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { toast } from 'sonner';
 
-type Booking = {
-  id: number;
-  booking_date: string;
-  start_time: string;
-  end_time: string;
-  customer_id: number;
-  service_name: string;
-  service_amount: string;
-  note: string | null;
-  status: string;
-  payment_status: string;
-  is_active: number;
-  created_at: string;
-};
-
-type Customer = {
-  id: number;
-  name: string;
-  phone_no: string;
-  email?: string;
-};
-
-type DashboardStats = {
-  todayBookings: Booking[];
-  upcomingBookings: Booking[];
-  totalRevenue: number;
-  pendingPayments: number;
-  totalCustomers: number;
-  bookingsWithPending: number;
+type DashboardData = {
+  today: {
+    bookings: Array<{
+      id: number;
+      booking_date: string;
+      start_time: string;
+      end_time: string;
+      customer_id: number;
+      service_name: string;
+      service_amount: number;
+      paid_amount: number;
+      balance: number;
+      status: string;
+      payment_status: string;
+      customer: {
+        id: number;
+        name: string;
+        phone_no: string;
+        email?: string;
+      };
+      staff: Array<{
+        id: number;
+        name: string;
+      }>;
+    }>;
+    total: number;
+    completed: number;
+    revenue: number;
+  };
+  upcoming: {
+    bookings: Array<{
+      id: number;
+      booking_date: string;
+      start_time: string;
+      service_name: string;
+      service_amount: number;
+      status: string;
+      payment_status: string;
+      customer: {
+        id: number;
+        name: string;
+        phone_no: string;
+      };
+    }>;
+    total: number;
+  };
+  financial: {
+    totalRevenue: number;
+    pendingPayments: number;
+    bookingsWithPending: number;
+  };
+  customers: {
+    total: number;
+  };
 };
 
 export function Dashboard() {
-  const [stats, setStats] = useState<DashboardStats>({
-    todayBookings: [],
-    upcomingBookings: [],
-    totalRevenue: 0,
-    pendingPayments: 0,
-    totalCustomers: 0,
-    bookingsWithPending: 0,
-  });
-  const [customers, setCustomers] = useState<Map<number, Customer>>(new Map());
+  const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Fetch dashboard data
+  // Fetch dashboard data from the optimized backend endpoint
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
         setLoading(true);
-
-        // Get today's date in YYYY-MM-DD format
-        const today = new Date().toISOString().split('T')[0];
-
-        // Fetch all bookings (we'll need to paginate if there are many)
-        const [bookingsRes, customersRes] = await Promise.all([
-          apiFetch('/api/bookings?page=1'),
-          apiFetch('/api/users?role=customer&page=1'),
-        ]);
-
-        if (!bookingsRes.ok || !customersRes.ok) {
-          throw new Error('Failed to fetch data');
-        }
-
-        const bookingsData = await bookingsRes.json();
-        const customersData = await customersRes.json();
-
-        console.log('📅 customersData data:', customersData);
-        const allBookings: Booking[] = bookingsData.bookings;
-
-        // Calculate stats
-        const todayBookings = allBookings.filter((b) => b.booking_date === today);
         
-        const upcomingBookings = allBookings.filter((b) => {
-          return b.booking_date > today;
-        });
-
-        // Calculate revenue (sum of service amounts for completed bookings)
-        const totalRevenue = allBookings
-          .filter((b) => b.status.toLowerCase() === 'completed')
-          .reduce((sum, b) => sum + parseFloat(b.service_amount), 0);
-
-        // For pending payments, we need to fetch payment data for each booking
-        // This is a simplified version - you may want to optimize this
-        let pendingPayments = 0;
-        let bookingsWithPending = 0;
-
-        for (const booking of allBookings) {
-          const serviceAmount = parseFloat(booking.service_amount);
-          
-          // Fetch payments for this booking
-          const paymentsRes = await apiFetch(`/api/payments?booking_id=${booking.id}`);
-          if (paymentsRes.ok) {
-            const payments = await paymentsRes.json();
-            const totalPaid = payments.reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
-            const balance = serviceAmount - totalPaid;
-            
-            if (balance > 0) {
-              pendingPayments += balance;
-              bookingsWithPending++;
-            }
-          }
+        const res = await apiFetch('/api/dashboard/stats');
+        
+        if (!res.ok) {
+          throw new Error('Failed to fetch dashboard data');
         }
-
-        // Build customer map
-        const customerMap = new Map<number, Customer>();
-        if (customersData.users) {
-          customersData.users.forEach((customer: Customer) => {
-            customerMap.set(customer.id, customer);
-          });
-        }
-
-        // Fetch customers for bookings that aren't in the map
-        const uniqueCustomerIds = [...new Set(allBookings.map(b => b.customer_id))];
-        for (const customerId of uniqueCustomerIds) {
-          if (!customerMap.has(customerId)) {
-            try {
-              const res = await apiFetch(`/api/users/${customerId}`);
-              if (res.ok) {
-                const customer = await res.json();
-                customerMap.set(customerId, customer);
-              }
-            } catch (error) {
-              console.error(`Failed to fetch customer ${customerId}:`, error);
-            }
-          }
-        }
-
-        setStats({
-          todayBookings,
-          upcomingBookings: upcomingBookings.slice(0, 10), // Limit to 10
-          totalRevenue,
-          pendingPayments,
-          totalCustomers: customersData.length || 0,
-          bookingsWithPending,
-        });
-
-        setCustomers(customerMap);
+        
+        const dashboardData = await res.json();
+        setData(dashboardData);
+        
       } catch (error: any) {
         console.error('Error fetching dashboard data:', error);
         toast.error(error.message || 'Failed to load dashboard data');
@@ -157,7 +96,10 @@ export function Dashboard() {
 
   // Helper functions
   const formatCurrency = (amount: number) => {
-    return `LKR ${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    return `LKR ${amount.toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
   };
 
   const formatDate = (dateStr: string) => {
@@ -184,10 +126,6 @@ export function Dashboard() {
       partial: 'bg-yellow-100 text-yellow-800',
     };
     return colors[status.toLowerCase()] || 'bg-gray-100 text-gray-800';
-  };
-
-  const getCustomerById = (customerId: number): Customer | undefined => {
-    return customers.get(customerId);
   };
 
   const containerVariants = {
@@ -217,6 +155,16 @@ export function Dashboard() {
       <div className="flex items-center justify-center h-96">
         <div className="text-center">
           <p className="text-xl text-gray-600 dark:text-gray-400">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!data) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center">
+          <p className="text-gray-600">No data available</p>
         </div>
       </div>
     );
@@ -253,10 +201,10 @@ export function Dashboard() {
             </CardHeader>
             <CardContent className="pt-4">
               <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">
-                {stats.todayBookings.length}
+                {data.today.total}
               </div>
               <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                {stats.todayBookings.filter((b) => b.status.toLowerCase() === 'completed').length} completed
+                {data.today.completed} completed
               </p>
             </CardContent>
           </Card>
@@ -272,7 +220,7 @@ export function Dashboard() {
             </CardHeader>
             <CardContent className="pt-4">
               <div className="text-3xl font-bold text-green-600 dark:text-green-400">
-                {formatCurrency(stats.totalRevenue)}
+                {formatCurrency(data.financial.totalRevenue)}
               </div>
               <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">From completed bookings</p>
             </CardContent>
@@ -289,10 +237,10 @@ export function Dashboard() {
             </CardHeader>
             <CardContent className="pt-4">
               <div className="text-3xl font-bold text-amber-600 dark:text-amber-400">
-                {formatCurrency(stats.pendingPayments)}
+                {formatCurrency(data.financial.pendingPayments)}
               </div>
               <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                {stats.bookingsWithPending} bookings
+                {data.financial.bookingsWithPending} bookings
               </p>
             </CardContent>
           </Card>
@@ -308,7 +256,7 @@ export function Dashboard() {
             </CardHeader>
             <CardContent className="pt-4">
               <div className="text-3xl font-bold text-purple-600 dark:text-purple-400">
-                {stats.totalCustomers}
+                {data.customers.total}
               </div>
               <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">Active records</p>
             </CardContent>
@@ -330,45 +278,42 @@ export function Dashboard() {
               </Button>
             </CardHeader>
             <CardContent>
-              {stats.todayBookings.length === 0 ? (
+              {data.today.bookings.length === 0 ? (
                 <p className="text-gray-500 dark:text-gray-400 text-center py-8">
                   No bookings scheduled for today
                 </p>
               ) : (
                 <div className="space-y-3">
-                  {stats.todayBookings.slice(0, 5).map((booking, index) => {
-                    const customer = getCustomerById(booking.customer_id);
-                    return (
-                      <motion.div
-                        key={booking.id}
-                        className="p-3 border rounded-lg hover:bg-blue-50 dark:hover:bg-blue-950 hover:border-blue-200 dark:hover:border-blue-800 transition-all duration-200"
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: index * 0.1 }}
-                        whileHover={{ x: 4 }}
-                      >
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <p className="font-medium">{customer?.name || 'Loading...'}</p>
-                            <p className="text-sm text-gray-600 dark:text-gray-400">
-                              {booking.service_name}
-                            </p>
-                            <div className="flex items-center gap-2 mt-1">
-                              <span className="text-sm text-gray-500 dark:text-gray-400">
-                                {formatTime(booking.start_time)}
-                              </span>
-                              <Badge className={getStatusColor(booking.status)}>
-                                {booking.status}
-                              </Badge>
-                            </div>
+                  {data.today.bookings.slice(0, 5).map((booking, index) => (
+                    <motion.div
+                      key={booking.id}
+                      className="p-3 border rounded-lg hover:bg-blue-50 dark:hover:bg-blue-950 hover:border-blue-200 dark:hover:border-blue-800 transition-all duration-200"
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.1 }}
+                      whileHover={{ x: 4 }}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <p className="font-medium">{booking.customer.name}</p>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">
+                            {booking.service_name}
+                          </p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-sm text-gray-500 dark:text-gray-400">
+                              {formatTime(booking.start_time)}
+                            </span>
+                            <Badge className={getStatusColor(booking.status)}>
+                              {booking.status}
+                            </Badge>
                           </div>
-                          <Button size="sm" variant="ghost" asChild>
-                            <Link to={`/bookings/${booking.id}`}>Details</Link>
-                          </Button>
                         </div>
-                      </motion.div>
-                    );
-                  })}
+                        <Button size="sm" variant="ghost" asChild>
+                          <Link to={`/bookings/${booking.id}`}>Details</Link>
+                        </Button>
+                      </div>
+                    </motion.div>
+                  ))}
                 </div>
               )}
             </CardContent>
@@ -388,51 +333,47 @@ export function Dashboard() {
               </Button>
             </CardHeader>
             <CardContent>
-              {stats.upcomingBookings.length === 0 ? (
+              {data.upcoming.bookings.length === 0 ? (
                 <p className="text-gray-500 dark:text-gray-400 text-center py-8">
                   No upcoming bookings
                 </p>
               ) : (
                 <div className="space-y-3">
-                  {stats.upcomingBookings.slice(0, 5).map((booking, index) => {
-                    const customer = getCustomerById(booking.customer_id);
-
-                    return (
-                      <motion.div
-                        key={booking.id}
-                        className="p-3 border rounded-lg hover:bg-green-50 dark:hover:bg-green-950 hover:border-green-200 dark:hover:border-green-800 transition-all duration-200"
-                        initial={{ opacity: 0, x: 20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: index * 0.1 }}
-                        whileHover={{ x: -4 }}
-                      >
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <p className="font-medium">{customer?.name || 'Loading...'}</p>
-                            <p className="text-sm text-gray-600 dark:text-gray-400">
-                              {booking.service_name}
-                            </p>
-                            <div className="flex items-center gap-2 mt-1">
-                              <span className="text-sm text-gray-500 dark:text-gray-400">
-                                {formatDate(booking.booking_date)}
-                              </span>
-                              <Badge className={getStatusColor(booking.payment_status)}>
-                                {booking.payment_status}
-                              </Badge>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <p className="font-medium text-gray-900 dark:text-gray-100">
-                              {formatCurrency(parseFloat(booking.service_amount))}
-                            </p>
-                            <Button size="sm" variant="ghost" asChild>
-                              <Link to={`/bookings/${booking.id}`}>View</Link>
-                            </Button>
+                  {data.upcoming.bookings.slice(0, 5).map((booking, index) => (
+                    <motion.div
+                      key={booking.id}
+                      className="p-3 border rounded-lg hover:bg-green-50 dark:hover:bg-green-950 hover:border-green-200 dark:hover:border-green-800 transition-all duration-200"
+                      initial={{ opacity: 0, x: 20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.1 }}
+                      whileHover={{ x: -4 }}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <p className="font-medium">{booking.customer.name}</p>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">
+                            {booking.service_name}
+                          </p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-sm text-gray-500 dark:text-gray-400">
+                              {formatDate(booking.booking_date)}
+                            </span>
+                            <Badge className={getStatusColor(booking.payment_status)}>
+                              {booking.payment_status}
+                            </Badge>
                           </div>
                         </div>
-                      </motion.div>
-                    );
-                  })}
+                        <div className="text-right">
+                          <p className="font-medium text-gray-900 dark:text-gray-100">
+                            {formatCurrency(booking.service_amount)}
+                          </p>
+                          <Button size="sm" variant="ghost" asChild>
+                            <Link to={`/bookings/${booking.id}`}>View</Link>
+                          </Button>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
                 </div>
               )}
             </CardContent>
