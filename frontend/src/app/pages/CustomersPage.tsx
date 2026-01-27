@@ -490,7 +490,7 @@ export function CustomersPage() {
                       </TableCell>
                       <TableCell className="text-right">
                         <Button variant="outline" size="sm" asChild>
-                          <Link to={`/customers/${customer.id}`}>View</Link>
+                          <Link to={`/customers/${customer.id}/details`}>View</Link>
                         </Button>
                       </TableCell>
                     </TableRow>
