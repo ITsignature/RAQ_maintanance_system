@@ -409,6 +409,7 @@ useEffect(() => {
       if (!res.ok) {
         throw new Error('Failed to download invoice');
       }
+      
 
       // Get filename from Content-Disposition header or use default
       const contentDisposition = res.headers.get('Content-Disposition');
