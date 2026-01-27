@@ -18,6 +18,7 @@ import {
 import { cn } from '@/lib/utils';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
+import { Loader } from '../components/Loader';
 
 type Booking = {
   id: number;
@@ -221,7 +222,8 @@ export function CalendarPage() {
         <CardContent>
           {loading ? (
             <div className="text-center py-12">
-              <p className="text-gray-500 dark:text-gray-400">Loading calendar...</p>
+              {/* <p className="text-gray-500 dark:text-gray-400">Loading calendar...</p> */}
+              <Loader />
             </div>
           ) : (
             /* Calendar Grid */

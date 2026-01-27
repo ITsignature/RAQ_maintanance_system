@@ -50,6 +50,7 @@ import {
 import { motion } from 'motion/react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import { Loader } from '../components/Loader';
 
 
 type Customer = {
@@ -336,7 +337,8 @@ export function SMSLogsPage() {
     return (
       <div className="flex items-center justify-center h-96">
         <div className="text-center">
-          <p className="text-xl text-gray-600 dark:text-gray-400">Loading customers...</p>
+          {/* <p className="text-xl text-gray-600 dark:text-gray-400">Loading customers...</p> */}
+          <Loader/>
         </div>
       </div>
     );

@@ -32,6 +32,7 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { Loader } from '../components/Loader';
 
 
 type Customer = {
@@ -189,7 +190,8 @@ export function CustomersPage() {
     return (
       <div className="flex items-center justify-center h-96">
         <div className="text-center">
-          <p className="text-xl text-gray-600 dark:text-gray-400">Loading customers...</p>
+          {/* <p className="text-xl text-gray-600 dark:text-gray-400">Loading customers...</p> */}
+          <Loader />
         </div>
       </div>
     );

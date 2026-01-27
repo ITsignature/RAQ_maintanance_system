@@ -193,7 +193,7 @@ export function SettingsPage() {
       <Card className="hidden md:block">
         <CardHeader>
           <CardTitle>User Accounts</CardTitle>
-          <CardDescription>Admins (role 2) and Staff (role 3)</CardDescription>
+          {/* <CardDescription>Admins (role 2) and Staff (role 3)</CardDescription> */}
         </CardHeader>
 
         <CardContent className="p-0">

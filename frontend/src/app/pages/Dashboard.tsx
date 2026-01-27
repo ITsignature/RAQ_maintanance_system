@@ -7,6 +7,8 @@ import { Calendar, Clock, DollarSign, Users, TrendingUp, Package } from 'lucide-
 import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { toast } from 'sonner';
+import { Loader } from '../components/Loader';
+
 
 type DashboardData = {
   today: {
@@ -154,7 +156,8 @@ export function Dashboard() {
     return (
       <div className="flex items-center justify-center h-96">
         <div className="text-center">
-          <p className="text-xl text-gray-600 dark:text-gray-400">Loading dashboard...</p>
+          {/* <p className="text-xl text-gray-600 dark:text-gray-400">Loading dashboard...</p> */}
+          <Loader/>
         </div>
       </div>
     );

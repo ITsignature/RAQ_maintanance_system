@@ -20,13 +20,14 @@ import { PaymentsPage } from '@/app/pages/PaymentsPage';
 import { ReportsPage } from '@/app/pages/ReportsPage';
 import { SMSLogsPage } from '@/app/pages/SMSLogsPage';
 import { SettingsPage } from '@/app/pages/SettingsPage';
+import { Loader } from './components/Loader';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isInitializing } = useAuth();
 
   if (isInitializing) {
-    return <div className="p-6">Loading...</div>;
-  }
+  return <Loader />;
+}
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
