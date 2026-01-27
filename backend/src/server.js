@@ -15,6 +15,7 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 // SECURITY & MIDDLEWARE
 // ============================================
 app.use(helmet());
+app.set("trust proxy", 1);
 
 // ⭐ IMPORTANT: Increase payload size limits for file uploads
 // Default is 100kb - increase to 50mb for invoice/image uploads
@@ -29,7 +30,7 @@ app.use(cookieParser());
 // If frontend is separate domain, enable CORS with credentials:
 app.use(
   cors({
-    origin: ["http://localhost:5173"], // change to your frontend
+     origin: ["https://maintenance.royalaquarium.lk"], // change to your frontend
     credentials: true,
   })
 );

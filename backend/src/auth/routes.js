@@ -12,14 +12,15 @@ function cookieOptions() {
     httpOnly: true,
     secure: process.env.COOKIE_SECURE === "true",
     sameSite: "lax",
-    path: "/auth/refresh",
+    path: "/api/auth/refresh",
     domain: process.env.COOKIE_DOMAIN || undefined,
   };
 }
 
 router.post("/login", async (req, res) => {
   const { phone_no, password } = req.body;
-
+  console.log(req.body);
+	
   const [rows] = await pool.query(
     "SELECT * FROM users WHERE phone_no=? AND is_active=1 LIMIT 1",
     [phone_no]
