@@ -30,7 +30,11 @@ app.use(cookieParser());
 // If frontend is separate domain, enable CORS with credentials:
 app.use(
   cors({
-     origin: ["https://maintenance.royalaquarium.lk","http://localhost:5173"], // change to your frontend
+     origin: [
+        "https://maintenance.royalaquarium.lk",
+        "https://www.maintenance.royalaquarium.lk",
+        "http://localhost:5173"
+      ],
     credentials: true,
   })
 );
