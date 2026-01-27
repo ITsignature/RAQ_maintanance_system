@@ -100,9 +100,14 @@ const handleSubmit = async (e: React.FormEvent) => {
             animate={{ scale: 1, rotate: 0 }}
             transition={{ delay: 0.2, type: 'spring', stiffness: 200 }}
           >
-            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center shadow-lg">
-              <Fish className="w-8 h-8 text-white" />
-            </div>
+           <div className="w-16 h-16 rounded-full bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center shadow-lg">
+          <img
+            src="/ARLogo.png"
+            alt="AR Logo"
+            className="w-20 h-20 object-contain"
+          />
+        </div>
+
           </motion.div>
           {/* Title */}
           <motion.h1

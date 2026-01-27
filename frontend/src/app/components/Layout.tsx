@@ -82,9 +82,9 @@ export function Layout() {
         animate={{ y: 0 }}
         transition={{ duration: 0.3 }}
       >
-        <div className="flex items-center justify-between h-16 px-4">
+        <div className="flex items-center justify-between h-16 px-2">
           {/* Left - Logo and Mobile Menu */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
             <button
               className="lg:hidden text-foreground"
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -94,11 +94,15 @@ export function Layout() {
             </button>
 
             <motion.div className="flex items-center gap-3" whileHover={{ scale: 1.02 }}>
-              <div className="bg-gradient-to-br from-cyan-500 to-blue-600 text-white p-2 rounded-lg shadow-lg">
-                <Fish className="w-5 h-5" />
-              </div>
+              <div className="bg-gradient-to-br  text-white p-1 rounded-lg">
+            <img
+              src="/ARLogo.png"
+              alt="AR Logo"
+              className="w-12 h-12 object-contain"
+            />
+          </div>
               <span className="font-semibold text-lg hidden sm:block bg-gradient-to-r from-cyan-600 to-blue-600 bg-clip-text text-transparent">
-                Aquarium System
+                Royal Aquarium
               </span>
             </motion.div>
           </div>
@@ -107,7 +111,7 @@ export function Layout() {
           <div className="flex items-center gap-4">
             {/* Notifications */}
             <DropdownMenu>
-              <DropdownMenuTrigger asChild>
+              {/* <DropdownMenuTrigger asChild>
                 <Button
                   variant="ghost"
                   size="icon"
@@ -123,7 +127,7 @@ export function Layout() {
                     </motion.div>
                   )}
                 </Button>
-              </DropdownMenuTrigger>
+              </DropdownMenuTrigger> */}
 
               <DropdownMenuContent
                 align="end"
