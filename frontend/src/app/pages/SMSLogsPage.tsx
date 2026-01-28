@@ -49,7 +49,7 @@ import {
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { toast } from 'sonner';
-import { format } from 'date-fns';
+import { format, parseISO, startOfDay } from "date-fns";
 import { Loader } from '../components/Loader';
 
 
@@ -198,30 +198,32 @@ export function SMSLogsPage() {
       );
     }
 
-    if (dateFilterType !== 'all' && filtered.length > 0) {
+    if (dateFilterType !== "all") {
       filtered = filtered.filter((customer) => {
         if (!customer.last_booking_date) return false;
 
-        const lastBooking = new Date(customer.last_booking_date);
+        // Parse the last booking date and normalize to start of day for comparison
+        const lastBooking = startOfDay(parseISO(customer.last_booking_date));
 
         switch (dateFilterType) {
-          case 'range':
-            if (startDate && endDate) {
-              return lastBooking >= startDate && lastBooking <= endDate;
-            }
-            return true;
+          case "range": {
+            if (!startDate || !endDate) return true;
+            const from = startOfDay(startDate);
+            const to = startOfDay(endDate);
+            return lastBooking >= from && lastBooking <= to;
+          }
 
-          case 'after':
-            if (singleDate) {
-              return lastBooking >= singleDate;
-            }
-            return true;
+          case "after": {
+            if (!singleDate) return true;
+            const from = startOfDay(singleDate);
+            return lastBooking >= from;
+          }
 
-          case 'before':
-            if (singleDate) {
-              return lastBooking <= singleDate;
-            }
-            return true;
+          case "before": {
+            if (!singleDate) return true;
+            const to = startOfDay(singleDate);
+            return lastBooking <= to;
+          }
 
           default:
             return true;
@@ -535,44 +537,86 @@ export function SMSLogsPage() {
 
             {dateFilterType === 'range' && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" className="w-full justify-start text-left font-normal">
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {startDate ? format(startDate, 'MMM dd, yyyy') : 'Start Date'}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar mode="single" selected={startDate} onSelect={setStartDate} initialFocus />
-                  </PopoverContent>
-                </Popover>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" className="w-full justify-start text-left font-normal">
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {endDate ? format(endDate, 'MMM dd, yyyy') : 'End Date'}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar mode="single" selected={endDate} onSelect={setEndDate} initialFocus />
-                  </PopoverContent>
-                </Popover>
+                <div className="flex gap-2">
+                  <Input
+                    type="date"
+                    value={startDate ? format(startDate, 'yyyy-MM-dd') : ''}
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        setStartDate(new Date(e.target.value));
+                      } else {
+                        setStartDate(undefined);
+                      }
+                    }}
+                    placeholder="Start Date"
+                    className="flex-1"
+                  />
+                  <Popover modal={true}>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="icon">
+                        <CalendarIcon className="h-4 w-4" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0 z-50" align="start" sideOffset={5}>
+                      <Calendar mode="single" selected={startDate} onSelect={setStartDate} initialFocus />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                <div className="flex gap-2">
+                  <Input
+                    type="date"
+                    value={endDate ? format(endDate, 'yyyy-MM-dd') : ''}
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        setEndDate(new Date(e.target.value));
+                      } else {
+                        setEndDate(undefined);
+                      }
+                    }}
+                    placeholder="End Date"
+                    className="flex-1"
+                  />
+                  <Popover modal={true}>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="icon">
+                        <CalendarIcon className="h-4 w-4" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0 z-50" align="start" sideOffset={5}>
+                      <Calendar mode="single" selected={endDate} onSelect={setEndDate} initialFocus />
+                    </PopoverContent>
+                  </Popover>
+                </div>
               </div>
             )}
 
             {(dateFilterType === 'after' || dateFilterType === 'before') && (
               <div className="w-full">
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" className="w-full justify-start text-left font-normal">
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {singleDate ? format(singleDate, 'MMM dd, yyyy') : 'Select Date'}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar mode="single" selected={singleDate} onSelect={setSingleDate} initialFocus />
-                  </PopoverContent>
-                </Popover>
+                <div className="flex gap-2">
+                  <Input
+                    type="date"
+                    value={singleDate ? format(singleDate, 'yyyy-MM-dd') : ''}
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        setSingleDate(new Date(e.target.value));
+                      } else {
+                        setSingleDate(undefined);
+                      }
+                    }}
+                    placeholder="Select Date"
+                    className="flex-1"
+                  />
+                  <Popover modal={true}>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="icon">
+                        <CalendarIcon className="h-4 w-4" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0 z-50" align="start" sideOffset={5}>
+                      <Calendar mode="single" selected={singleDate} onSelect={setSingleDate} initialFocus />
+                    </PopoverContent>
+                  </Popover>
+                </div>
               </div>
             )}
           </div>

@@ -272,7 +272,7 @@ export function CustomersPage() {
             Manage your customer database
           </p>
         </div>
-      <div className="flex gap-2 w-full sm:w-auto">
+      <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
   <Button
     variant="outline"
     onClick={exportToPDF}
