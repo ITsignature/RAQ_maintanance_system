@@ -440,7 +440,7 @@ export function CustomersPage() {
                     <TableRow key={customer.id} className="hover:bg-gray-50 dark:hover:bg-gray-900">
                       <TableCell>
                         <Link
-                          to={`/customers/${customer.id}`}
+                          to={`/customers/${customer.id}/details`}
                           className="font-medium hover:text-blue-600 dark:hover:text-blue-400"
                         >
                           {customer.name}
@@ -520,7 +520,7 @@ export function CustomersPage() {
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <Link
-                        to={`/customers/${customer.id}`}
+                        to={`/customers/${customer.id}/details`}
                         className="font-semibold text-lg hover:text-blue-600 dark:hover:text-blue-400"
                       >
                         {customer.name}
@@ -572,7 +572,7 @@ export function CustomersPage() {
                       </span>
                     </div>
                     <Button variant="outline" size="sm" asChild>
-                      <Link to={`/customers/${customer.id}`}>View</Link>
+                      <Link to={`/customers/${customer.id}/details`}>View</Link>
                     </Button>
                   </div>
                 </motion.div>

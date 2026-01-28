@@ -591,7 +591,7 @@ useEffect(() => {
             <CardContent>
               <div className="space-y-3">
                 <div>
-                  <Link to={`/customers/${customer.id}`}>
+                  <Link to={`/customers/${customer.id}/details`}>
                     <p className="text-2xl font-bold hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer">
                       {customer.name}
                     </p>

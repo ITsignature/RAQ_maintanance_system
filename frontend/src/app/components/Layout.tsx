@@ -93,7 +93,7 @@ export function Layout() {
               {isSidebarOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
 
-            <motion.div className="flex items-center gap-3" whileHover={{ scale: 1.02 }}>
+            {/* <motion.div className="flex items-center gap-3" whileHover={{ scale: 1.02 }}>
               <div className="bg-gradient-to-br  text-white p-1 rounded-lg">
             <img
               src="/ARLogo.png"
@@ -104,7 +104,25 @@ export function Layout() {
               <span className="font-semibold text-lg hidden sm:block bg-gradient-to-r from-cyan-600 to-blue-600 bg-clip-text text-transparent">
                 Royal Aquarium
               </span>
-            </motion.div>
+            </motion.div> */}
+            <Link to="/">
+  <motion.div
+    className="flex items-center gap-3 cursor-pointer"
+    whileHover={{ scale: 1.02 }}
+  >
+    <div className="bg-gradient-to-br text-white p-1 rounded-lg">
+      <img
+        src="/ARLogo.png"
+        alt="AR Logo"
+        className="w-12 h-12 object-contain"
+      />
+    </div>
+    <span className="font-semibold text-lg hidden sm:block bg-gradient-to-r from-cyan-600 to-blue-600 bg-clip-text text-transparent">
+      Royal Aquarium
+    </span>
+  </motion.div>
+</Link>
+
           </div>
 
           {/* Right - Notifications, User, Theme */}
