@@ -773,5 +773,6 @@ export function SMSLogsPage() {
         </CardContent>
       </Card>
     </motion.div>
+    
   );
 }
