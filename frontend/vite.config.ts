@@ -16,4 +16,9 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  server: {
+   proxy: {
+      "/uploads": "https://maintenance.royalaquarium.lk",
+    },
+  },
 })

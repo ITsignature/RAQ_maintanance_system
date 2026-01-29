@@ -447,7 +447,12 @@ export function BookingsList() {
                             <TableCell>
                               <Badge className={getStatusColor(booking.payment_status)}>{booking.payment_status}</Badge>
                             </TableCell>
-                            <TableCell className="text-right">{formatCurrency(booking.service_amount)}</TableCell>
+                            
+                          <TableCell className="text-right">
+                          {booking.service_amount === "0.00"
+                            ? "Not assigned"
+                            : formatCurrency(booking.service_amount)}
+                        </TableCell>
                             <TableCell className="text-right">
                               <div className="flex justify-end gap-2">
                                 <Link to={`/bookings/${booking.id}`}>

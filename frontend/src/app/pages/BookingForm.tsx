@@ -400,7 +400,7 @@ export function BookingForm() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Total Amount (LKR)</Label>
+                    <Label>Total Amount (LKR) (Optional)</Label>
                     <Input
                       type="number"
                       step="0.01"

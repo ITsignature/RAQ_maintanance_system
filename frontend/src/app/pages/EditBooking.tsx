@@ -46,7 +46,8 @@ export function EditBooking() {
     serviceName: '',
     totalAmount: '',
     notes: '',
-    status: 'Scheduled' as 'Scheduled' | 'In Progress' | 'Completed' | 'Cancelled',
+    status: 'pending' as 'pending' | 'confirmed' | 'completed' | 'cancelled',
+
   });
 
   const staffDropdownRef = useRef<HTMLDivElement>(null);
@@ -178,8 +179,10 @@ export function EditBooking() {
         status: formData.status,
       };
 
-      const res = await apiFetch(`/api/bookings/${id}`, {
+      console.log('📅 Payload:', payload);
+     const res = await apiFetch(`/api/bookings/${id}`, {
         method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
 

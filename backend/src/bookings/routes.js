@@ -31,6 +31,7 @@ const bookingUpdateSchema = z.object({
   service_amount: z.number().nonnegative().optional(),
   note: z.union([z.string(), z.null()]).optional(),
   staff_ids: z.array(z.number().int().positive()).optional(),
+  status: z.enum(["pending", "confirmed", "completed", "cancelled"]).optional(),
 }).refine(
   (data) => {
     const timeFields = [data.start_time, data.end_time, data.booking_date];
@@ -120,6 +121,8 @@ router.get(
   requireRole(1, 2, 3),
   asyncHandler(async (req, res) => {
     const bookingId = req.params.id;
+
+    console.log(bookingId);
     
     const [rows] = await pool.query(
       `SELECT 
@@ -222,10 +225,16 @@ router.patch(
   asyncHandler(async (req, res) => {
     const bookingId = parseInt(req.params.id, 10);
     if (!Number.isInteger(bookingId) || bookingId <= 0) {
+      console.log(bookingId);
       return res.status(400).json({ message: "Invalid booking ID" });
+      
     }
 
+
+    console.log(req.body);
     const parsed = bookingUpdateSchema.safeParse(req.body);
+    console.log(parsed);  
+
     if (!parsed.success) {
       return res.status(400).json({
         message: "Validation failed",
@@ -234,6 +243,10 @@ router.patch(
     }
 
     const data = parsed.data;
+
+    
+
+    console.log("data",data);
 
     // Conflict check if date/time is being changed
     if (data.booking_date || data.start_time || data.end_time) {
@@ -380,10 +393,11 @@ router.patch(
       updates.push("note = ?");
       values.push(data.note);
     }
-    if (data.status) {
+    if (data.status !== undefined) {
       updates.push("status = ?");
       values.push(data.status);
     }
+
 
     updates.push("updated_at = NOW()");
 

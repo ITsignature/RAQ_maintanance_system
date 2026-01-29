@@ -327,9 +327,9 @@ export function CalendarPage() {
             <div className="flex items-center gap-2">
               <Badge className={getStatusColor('pending')}>Pending</Badge>
             </div>
-            <div className="flex items-center gap-2">
+            {/* <div className="flex items-center gap-2">
               <Badge className={getStatusColor('scheduled')}>Scheduled</Badge>
-            </div>
+            </div> */}
             <div className="flex items-center gap-2">
               <Badge className={getStatusColor('completed')}>Completed</Badge>
             </div>

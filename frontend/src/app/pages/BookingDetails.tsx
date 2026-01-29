@@ -61,6 +61,13 @@ type Booking = {
   staff: { id: number; name: string; phone_no: string }[]; 
 };
 
+type BookingImage = {
+  id: number;
+  booking_id: number;
+  file_path: string;
+  uploaded_at: string;
+};
+
 type Customer = {
   id: number;
   name: string;
@@ -102,6 +109,12 @@ export function BookingDetails() {
   const [loading, setLoading] = useState(true);
   const [staff, setStaff] = useState<{ id: number; name: string; phone_no: string }[]>([]);
 
+  const [images, setImages] = useState<BookingImage[]>([]);
+  const [isImageDialogOpen, setIsImageDialogOpen] = useState(false);
+  const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+
+
 
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -119,8 +132,87 @@ export function BookingDetails() {
   const [paidAt, setPaidAt] = useState(() => {
   const d = new Date();
   return d.toISOString().slice(0, 10); // "YYYY-MM-DD"
+
+  
 });
 
+const fetchImages = async () => {
+  try {
+    const res = await apiFetch(`/api/images/booking/${id}`);
+    if (!res.ok) throw new Error('Failed to fetch images');
+    setImages(await res.json());
+  } catch (err) {
+    console.error(err);
+  }
+};
+
+const handleUploadImage = async () => {
+  if (!selectedImageFile) {
+    toast.error("Please select an image");
+    return;
+  }
+
+  const maxSize = 10 * 1024 * 1024;
+  if (selectedImageFile.size > maxSize) {
+    toast.error("File too large (max 10MB)");
+    return;
+  }
+
+  const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+  if (!allowedTypes.includes(selectedImageFile.type)) {
+    toast.error("Only JPEG, PNG, WEBP images allowed");
+    return;
+  }
+
+  try {
+    setUploadingImage(true);
+    const fd = new FormData();
+    fd.append("image", selectedImageFile);
+    fd.append("booking_id", id!);
+
+    const res = await apiFetch("/api/images/upload", {
+      method: "POST",
+      body: fd,
+    });
+
+    if (!res.ok) {
+      let msg = "Failed to upload image";
+      try {
+        const e = await res.json();
+        msg = e.message || msg;
+      } catch {}
+      throw new Error(msg);
+    }
+
+    toast.success("Image uploaded");
+    setSelectedImageFile(null);
+    setIsImageDialogOpen(false);
+    await fetchImages();
+  } catch (err: any) {
+    toast.error(err.message || "Upload failed");
+  } finally {
+    setUploadingImage(false);
+  }
+};
+
+const handleDeleteImage = async (imageId: number) => {
+  if (!confirm("Delete this image?")) return;
+
+  try {
+    const res = await apiFetch(`/api/images/${imageId}`, { method: "DELETE" });
+    if (!res.ok) throw new Error("Failed to delete image");
+    toast.success("Image deleted");
+    await fetchImages();
+  } catch (err: any) {
+    toast.error(err.message || "Delete failed");
+  }
+};
+
+const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  setSelectedImageFile(file);
+};
 
   
 // Fetch booking details
@@ -224,6 +316,7 @@ useEffect(() => {
   fetchCustomer(booking.customer_id);
   fetchPayments();
   fetchInvoices();
+   fetchImages();
 
 }, [booking]);           // ← correct place for these
 
@@ -549,6 +642,25 @@ useEffect(() => {
   const totalPaid = getTotalPaid();
   const balance = getBalance();
 
+  // Treat "YYYY-MM-DD" as a local date (avoids timezone shifting)
+const parseLocalDate = (dateStr: string) => {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, m - 1, d);
+};
+
+const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+
+const bookingDay = startOfDay(parseLocalDate(booking.booking_date));
+const today = startOfDay(new Date());
+
+// true when today is booking day or later
+const canBeCompleted = today >= bookingDay;
+
+// What the UI should *display* (lock completed until date)
+const displayStatus =
+booking.status === 'completed' && !canBeCompleted ? 'confirmed' : booking.status;
+
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -657,7 +769,9 @@ useEffect(() => {
                 </div>
                 <div>
                   <p className="text-sm text-gray-600 dark:text-gray-400">Service Amount</p>
-                  <p className="font-medium">{formatCurrency(booking.service_amount)}</p>
+                  <p className="font-medium">{booking.service_amount === "0.00"
+                            ? "Not assigned"
+                            : formatCurrency(booking.service_amount)}</p>
                 </div>
                 {booking.note && (
                   <div className="md:col-span-2">
@@ -701,9 +815,13 @@ useEffect(() => {
                 {booking.status === 'pending' && (
                   <Button onClick={() => handleStatusUpdate('confirmed')}>Mark Confirmed</Button>
                 )}
-                {booking.status === 'confirmed' && (
+                {/* {booking.status === 'confirmed' && (
+                  <Button onClick={() => handleStatusUpdate('completed')}>Mark Completed</Button>
+                )} */}
+                {booking.status === 'confirmed' && canBeCompleted && (
                   <Button onClick={() => handleStatusUpdate('completed')}>Mark Completed</Button>
                 )}
+
                 {booking.status === 'completed' && (
                   <Button variant="outline" disabled>
                     Completed
@@ -738,7 +856,9 @@ useEffect(() => {
               <div className="space-y-4">
                 <div>
                   <p className="text-sm text-gray-600 dark:text-gray-400">Total Amount</p>
-                  <p className="text-3xl font-bold">{formatCurrency(booking.service_amount)}</p>
+                  <p className="text-3xl font-bold">{booking.service_amount === "0.00"
+                            ? "Not assigned"
+                            : formatCurrency(booking.service_amount)}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600 dark:text-gray-400">Paid Amount</p>
@@ -996,6 +1116,120 @@ useEffect(() => {
               )}
             </CardContent>
           </Card>
+        {/* Tank Images */}
+<Card>
+  <CardHeader className="flex flex-row items-center justify-between">
+    <CardTitle className="flex items-center gap-2">
+      <FileText className="w-5 h-5" />
+      Tank Images
+    </CardTitle>
+
+    <Dialog open={isImageDialogOpen} onOpenChange={setIsImageDialogOpen}>
+      <DialogTrigger asChild>
+        <Button size="sm">
+          <Plus className="w-4 h-4 mr-2" />
+          Upload
+        </Button>
+      </DialogTrigger>
+
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Upload Tank Image</DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div>
+            <Label htmlFor="tank-image-file">Image File</Label>
+            <Input
+              id="tank-image-file"
+              type="file"
+              accept=".jpg,.jpeg,.png,.webp"
+              onChange={handleImageFileChange}
+              className="cursor-pointer"
+            />
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+              Accepted: JPEG, PNG, WEBP (Max 10MB)
+            </p>
+
+            {selectedImageFile && (
+              <p className="text-sm text-green-600 mt-2">
+                Selected: {selectedImageFile.name} ({formatFileSize(selectedImageFile.size)})
+              </p>
+            )}
+          </div>
+
+          <div className="flex gap-2">
+            <Button
+              className="flex-1"
+              onClick={handleUploadImage}
+              disabled={!selectedImageFile || uploadingImage}
+            >
+              {uploadingImage ? "Uploading..." : "Upload Image"}
+            </Button>
+
+            <Button
+              variant="outline"
+              onClick={() => {
+                setSelectedImageFile(null);
+                setIsImageDialogOpen(false);
+              }}
+              disabled={uploadingImage}
+            >
+              Cancel
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  </CardHeader>
+
+  <CardContent>
+    {images.length === 0 ? (
+      <div className="text-center py-6">
+        <FileText className="w-12 h-12 mx-auto mb-3 text-gray-400" />
+        <p className="text-sm text-gray-600 dark:text-gray-400">No tank images uploaded</p>
+      </div>
+    ) : (
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        {images.map((img) => (
+          <div
+            key={img.id}
+            className="relative group border rounded-lg overflow-hidden bg-gray-50"
+          >
+            <a
+              href={img.file_path}
+              target="_blank"
+              rel="noreferrer"
+              className="block"
+            >
+              <img
+                src={img.file_path}
+                alt={`Tank ${img.id}`}
+                className="w-full h-32 object-cover"
+              />
+            </a>
+
+            <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition">
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={() => handleDeleteImage(img.id)}
+              >
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            </div>
+
+            <div className="p-2 text-xs text-gray-500">
+              {formatDate(img.uploaded_at)}
+            </div>
+          </div>
+        ))}
+      </div>
+    )}
+  </CardContent>
+</Card>
+
+        
         </div>
       </div>
 

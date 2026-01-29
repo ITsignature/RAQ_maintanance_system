@@ -106,3 +106,16 @@ CREATE TABLE payments (
   INDEX idx_pay_paid_at (paid_at),
   INDEX idx_pay_active (is_active)
 );
+
+
+
+CREATE TABLE booking_images (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  booking_id INT NOT NULL,
+  file_path VARCHAR(500) NOT NULL,
+  uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  created_by INT NULL,
+  is_active TINYINT(1) DEFAULT 1,
+
+  INDEX (booking_id)
+);

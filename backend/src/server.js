@@ -11,6 +11,7 @@ const app = express();
 // Serve static files from the 'uploads' directory
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
+
 // ============================================
 // SECURITY & MIDDLEWARE
 // ============================================
@@ -60,6 +61,7 @@ const invoicesRoutes = require("./invoices/routes");
 const smsRoutes = require("./sms/routes");
 const { requireAuth, requireRole } = require("./auth/middleware");
 const dashboardRoutes = require("./dashboard/routes");
+const imageRoutes = require("./images/routes");
 
 // Health check
 app.get("/health", (req, res) => res.json({ ok: true }));
@@ -72,6 +74,7 @@ app.use("/api/payments", paymentsRoutes);
 app.use("/api/invoices", invoicesRoutes);
 app.use('/api/sms', smsRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/images', imageRoutes);
 // Protected routes examples
 app.get("/api/admin/only", requireAuth, requireRole(1, 2), (req, res) => {
   res.json({ message: "Hello staff!", user: req.user });
