@@ -141,7 +141,19 @@ export function BookingDetails() {
   return d.toISOString().slice(0, 10); // "YYYY-MM-DD"
 
   
+
+  
 });
+
+const toYmd = (d: Date) => {
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+};
+
+const todayYmd = toYmd(new Date());
+const bookingYmd = booking?.booking_date ?? todayYmd; // fallback
 
 const fetchImages = async () => {
   try {
@@ -341,6 +353,17 @@ useEffect(() => {
       toast.error('Payment amount cannot exceed remaining balance');
       return;
     }
+
+    if (!booking) return;
+
+    const minDate = booking.booking_date; // YYYY-MM-DD
+    const maxDate = todayYmd;
+
+    if (paidAt < minDate || paidAt > maxDate) {
+      toast.error(`Payment date must be between ${minDate} and ${maxDate}`);
+      return;
+    }
+
 
     try {
       const res = await apiFetch('/api/payments', {
@@ -586,9 +609,23 @@ useEffect(() => {
     });
   };
 
+  // const formatTime = (timeString: string) => {
+  //   return timeString.substring(0, 5);
+  // };
+
   const formatTime = (timeString: string) => {
-    return timeString.substring(0, 5);
-  };
+  // expects "HH:mm:ss" or "HH:mm"
+  const [hh, mm] = timeString.split(":").map(Number);
+  const d = new Date();
+  d.setHours(hh, mm || 0, 0, 0);
+
+  return d.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+};
+
 
   const formatCurrency = (amount: string | number) => {
     const num = typeof amount === 'string' ? parseFloat(amount) : amount;
@@ -926,11 +963,14 @@ booking.status === 'completed' && !canBeCompleted ? 'confirmed' : booking.status
                       <div>
                       <Label htmlFor="paidAt">Paid Date</Label>
                       <Input
-                        id="paidAt"
-                        type="date"
-                        value={paidAt}
-                        onChange={(e) => setPaidAt(e.target.value)}
-                      />
+                    id="paidAt"
+                    type="date"
+                    value={paidAt}
+                    min={bookingYmd}
+                    max={todayYmd}
+                    onChange={(e) => setPaidAt(e.target.value)}
+                  />
+
                     </div>
 
                       <div>
