@@ -8,9 +8,16 @@ import { Label } from '@/app/components/ui/label';
 import { Textarea } from '@/app/components/ui/textarea';
 import { ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
+import { useLocation } from "react-router-dom";
+
 
 export function CustomerForm() {
   const navigate = useNavigate();
+
+  const location = useLocation() as any;
+  const returnTo = location?.state?.returnTo;
+  const bookingDraft = location?.state?.bookingDraft;
+
 
   const [formData, setFormData] = useState({
     name: '',
@@ -70,7 +77,19 @@ export function CustomerForm() {
 
       // Optional: go to the new customer's detail page
       // navigate(`/customers/${data.customer_id}`);
-      navigate('/customers');
+      navigate(returnTo || "/customers", {
+      state: {
+        bookingDraft,
+        createdCustomer: {
+          id: data.customer_id,
+          name: payload.name,
+          phone_no: payload.phone_no,
+          email: payload.email ?? null,
+          loyalty_number: payload.loyalty_number ?? null,
+        },
+      },
+    });
+
 
     } catch (err) {
       console.error(err);
@@ -86,7 +105,8 @@ export function CustomerForm() {
         <Button
           variant="outline"
           size="icon"
-          onClick={() => navigate('/customers')}
+          onClick={() => navigate(returnTo || "/customers", { state: { bookingDraft } })}
+
         >
           <ArrowLeft className="w-4 h-4" />
         </Button>

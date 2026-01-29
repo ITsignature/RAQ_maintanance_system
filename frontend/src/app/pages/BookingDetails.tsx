@@ -45,6 +45,13 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
+
+const PUBLIC_ORIGIN =
+  import.meta.env.VITE_PUBLIC_ORIGIN || window.location.origin;
+
+const toPublicUrl = (p: string) =>
+  !p ? "" : p.startsWith("http") ? p : `${PUBLIC_ORIGIN}${p}`;
+
 type Booking = {
   id: number;
   booking_date: string;
@@ -679,6 +686,24 @@ booking.status === 'completed' && !canBeCompleted ? 'confirmed' : booking.status
             {formatDate(booking.booking_date)} at {formatTime(booking.start_time)}
           </p>
         </div>
+        <Button
+          onClick={() =>
+            navigate("/bookings/new", {
+              state: {
+                prefillCustomer: {
+                  id: customer.id,
+                  name: customer.name,
+                  phone_no: customer.phone_no,
+                  email: customer.email ?? null,
+                  loyalty_number: customer.loyalty_number ?? null,
+                },
+              },
+            })
+          }
+        >
+          Create Booking
+        </Button>
+
         <div className="flex gap-2">
           <Link to={`/bookings/${booking.id}/edit`}>
             <Button variant="outline">
@@ -1196,18 +1221,21 @@ booking.status === 'completed' && !canBeCompleted ? 'confirmed' : booking.status
             key={img.id}
             className="relative group border rounded-lg overflow-hidden bg-gray-50"
           >
-            <a
-              href={img.file_path}
-              target="_blank"
-              rel="noreferrer"
-              className="block"
-            >
-              <img
-                src={img.file_path}
-                alt={`Tank ${img.id}`}
-                className="w-full h-32 object-cover"
-              />
-            </a>
+           <a
+            href={toPublicUrl(img.file_path)}
+            target="_blank"
+            rel="noreferrer"
+            className="block"
+          >
+            <img
+              src={toPublicUrl(img.file_path)}
+              alt={`Tank ${img.id}`}
+              className="w-full h-32 object-cover"
+              loading="lazy"
+              onError={() => console.log("IMG FAIL:", toPublicUrl(img.file_path))}
+            />
+          </a>
+
 
             <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition">
               <Button

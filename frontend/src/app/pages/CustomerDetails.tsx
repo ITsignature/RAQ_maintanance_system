@@ -196,12 +196,31 @@ export function CustomerDetails() {
             </p>
           </div>
         </div>
+        <div className="flex items-center gap-2">
+             <Button
+                  onClick={() =>
+                    navigate("/bookings/new", {
+                      state: {
+                        prefillCustomer: {
+                          id: customer.id,
+                          name: customer.name,
+                          phone_no: customer.phone_no,
+                          email: customer.email ?? null,
+                          loyalty_number: customer.loyalty_number ?? null,
+                        },
+                      },
+                    })
+                  }
+                >
+                  Create Booking
+                </Button>
         <Link to={`/customers/${customer.id}/edit`}>
           <Button>
             <Edit2 className="w-4 h-4 mr-2" />
             Edit Customer
           </Button>
         </Link>
+        </div>
       </div>
 
       {/* Customer Information */}

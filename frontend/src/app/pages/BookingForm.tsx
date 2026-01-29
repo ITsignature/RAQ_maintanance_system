@@ -9,6 +9,8 @@ import { Textarea } from "@/app/components/ui/textarea";
 import { toast } from "sonner";
 import { Badge } from "@/app/components/ui/badge";
 import { ArrowLeft, AlertCircle, X } from "lucide-react";
+import { useLocation } from "react-router-dom";
+
 
 type Staff = { id: number; name: string; phone_no: string };
 type Customer = {
@@ -21,6 +23,7 @@ type Customer = {
 
 export function BookingForm() {
   const navigate = useNavigate();
+  const location = useLocation() as any;
 
   // -------- staff (fetch on load)
   const [staffList, setStaffList] = useState<Staff[]>([]);
@@ -117,6 +120,61 @@ export function BookingForm() {
       }
     })();
   }, []);
+
+  useEffect(() => {
+  const prefill = location?.state?.prefillCustomer;
+  if (!prefill?.id) return;
+
+  // select customer
+  setFormData((prev) => ({ ...prev, customerId: String(prefill.id) }));
+
+  // show name in input box
+  setCustomerQuery(prefill.name);
+
+  // ensure selectedCustomer works (it searches in `customers`)
+  setCustomers((prev) => {
+    const exists = prev.some((c) => c.id === prefill.id);
+    return exists ? prev : [prefill, ...prev];
+  });
+
+  // close dropdown
+  setShowCustomerDropdown(false);
+
+  // clear state so it doesn't re-run on refresh
+  navigate(".", { replace: true });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, []);
+
+
+  // ======= restore form data after customer creation
+    useEffect(() => {
+      const draft = location?.state?.bookingDraft;
+      const created = location?.state?.createdCustomer;
+
+      if (draft) {
+        setFormData(draft);
+        setCustomerQuery(location?.state?.customerQuery || "");
+      }
+
+      if (created?.id) {
+        // select the new customer
+        setFormData((prev) => ({ ...prev, customerId: String(created.id) }));
+        setCustomerQuery(created.name); // show name in input
+
+        // ensure it's in the dropdown list so selectedCustomer works
+        setCustomers((prev) => {
+          const exists = prev.some((c) => c.id === created.id);
+          return exists ? prev : [created, ...prev];
+        });
+      }
+
+      // clear navigation state so refresh/click doesn't re-apply
+      if (draft || created) {
+        navigate(".", { replace: true });
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
 
   // ======= lazy customer search with debounce
   const debounceRef = useRef<number | null>(null);
@@ -513,9 +571,23 @@ export function BookingForm() {
                     </div>
                   )}
 
-                  <Button type="button" variant="outline" className="w-full" onClick={() => navigate("/customers/new")}>
+                 <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    onClick={() =>
+                      navigate("/customers/new", {
+                        state: {
+                          returnTo: "/bookings/new",
+                          bookingDraft: formData,
+                          customerQuery,
+                        },
+                      })
+                    }
+                  >
                     + Add New Customer
                   </Button>
+
                 </div>
               </CardContent>
             </Card>
