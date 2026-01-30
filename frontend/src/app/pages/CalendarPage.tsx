@@ -279,7 +279,7 @@ export function CalendarPage() {
                     </div>
 
                     <div className="space-y-1">
-                      {dayBookings.slice(0, 3).map((booking) => {
+                      {dayBookings.slice(0, 8).map((booking) => {
                         const customer = getCustomerById(booking.customer_id);
                         return (
                           <Link
