@@ -25,6 +25,8 @@ import { toast } from 'sonner';
 import { motion } from 'motion/react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { useNavigate } from "react-router-dom";
+
 
 
 
@@ -76,7 +78,7 @@ export function BookingsList() {
 
   const [fromDate, setFromDate] = useState<string>(today);
   const [toDate, setToDate] = useState<string>(today);
- 
+  const navigate = useNavigate();
 
   // Fetch bookings from API
   const fetchBookings = async () => {
@@ -429,45 +431,55 @@ export function BookingsList() {
                         const customer = getCustomerById(booking.customer_id);
 
                         return (
-                          <TableRow key={booking.id}>
-                            <TableCell>
-                              <div>
-                                <p className="font-medium">{formatDate(booking.booking_date)}</p>
-                                <p className="text-sm text-gray-600">
-                                  {booking.start_time.substring(0, 5)} - {booking.end_time.substring(0, 5)}
-                                </p>
-                              </div>
-                            </TableCell>
-                            <TableCell>{customer?.name || 'Loading...'}</TableCell>
-                            <TableCell>{customer?.phone_no || 'N/A'}</TableCell>
-                            <TableCell>{booking.service_name}</TableCell>
-                            <TableCell>
-                              <Badge className={getStatusColor(booking.status)}>{booking.status}</Badge>
-                            </TableCell>
-                            <TableCell>
-                              <Badge className={getStatusColor(booking.payment_status)}>{booking.payment_status}</Badge>
-                            </TableCell>
-                            
-                          <TableCell className="text-right">
-                          {booking.service_amount === "0.00"
-                            ? "Not assigned"
-                            : formatCurrency(booking.service_amount)}
-                        </TableCell>
-                            <TableCell className="text-right">
-                              <div className="flex justify-end gap-2">
-                                <Link to={`/bookings/${booking.id}`}>
-                                  <Button size="sm" variant="ghost">
-                                    <Eye className="w-4 h-4" />
-                                  </Button>
-                                </Link>
-                                <Link to={`/bookings/${booking.id}/edit`}>
-                                  <Button size="sm" variant="ghost">
-                                    <Edit2 className="w-4 h-4" />
-                                  </Button>
-                                </Link>
-                              </div>
-                            </TableCell>
-                          </TableRow>
+                                    <TableRow
+              key={booking.id}
+              onClick={() => navigate(`/bookings/${booking.id}`)}
+              className="cursor-pointer hover:bg-gray-100 transition"
+            >
+              <TableCell>
+                <div>
+                  <p className="font-medium">{formatDate(booking.booking_date)}</p>
+                  <p className="text-sm text-gray-600">
+                    {booking.start_time.substring(0, 5)} - {booking.end_time.substring(0, 5)}
+                  </p>
+                </div>
+              </TableCell>
+
+              <TableCell>{customer?.name || 'Loading...'}</TableCell>
+              <TableCell>{customer?.phone_no || 'N/A'}</TableCell>
+              <TableCell>{booking.service_name}</TableCell>
+
+              <TableCell>
+                <Badge className={getStatusColor(booking.status)}>
+                  {booking.status}
+                </Badge>
+              </TableCell>
+
+              <TableCell>
+                <Badge className={getStatusColor(booking.payment_status)}>
+                  {booking.payment_status}
+                </Badge>
+              </TableCell>
+
+              <TableCell className="text-right">
+                {booking.service_amount === "0.00"
+                  ? "Not assigned"
+                  : formatCurrency(booking.service_amount)}
+              </TableCell>
+
+              <TableCell className="text-right">
+                <Link
+                  to={`/bookings/${booking.id}/edit`}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Button size="sm" variant="ghost">
+                    <Edit2 className="w-4 h-4" />
+                  </Button>
+                </Link>
+              </TableCell>
+            </TableRow>
+
+
                         );
                       })
                     )}

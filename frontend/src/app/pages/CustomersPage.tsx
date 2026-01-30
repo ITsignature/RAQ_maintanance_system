@@ -33,6 +33,7 @@ import { format } from 'date-fns';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { Loader } from '../components/Loader';
+import { useNavigate } from 'react-router-dom';
 
 
 type Customer = {
@@ -58,7 +59,7 @@ export function CustomersPage() {
   const [startDate, setStartDate] = useState<Date | undefined>(undefined);
   const [endDate, setEndDate] = useState<Date | undefined>(undefined);
   const [singleDate, setSingleDate] = useState<Date | undefined>(undefined);
-
+  const navigate = useNavigate();
   // Fetch customers with their last booking date
   const fetchCustomers = async () => {
     try {
@@ -425,80 +426,87 @@ export function CustomersPage() {
                   <TableHead>Loyalty #</TableHead>
                   <TableHead className="text-center">Total Bookings</TableHead>
                   <TableHead>Last Booking</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  {/* <TableHead className="text-right">Actions</TableHead> */}
                 </TableRow>
               </TableHeader>
-              <TableBody>
-                {filteredCustomers.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-gray-500">
-                      {hasActiveFilters ? 'No customers match your filters' : 'No customers found'}
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredCustomers.map((customer) => (
-                    <TableRow key={customer.id} className="hover:bg-gray-50 dark:hover:bg-gray-900">
-                      <TableCell>
-                        <Link
-                          to={`/customers/${customer.id}/details`}
-                          className="font-medium hover:text-blue-600 dark:hover:text-blue-400"
-                        >
-                          {customer.name}
-                        </Link>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col gap-1">
-                          <div className="flex items-center gap-2 text-sm">
-                            <Phone className="w-3 h-3 text-gray-400" />
-                            <a
-                              href={`tel:${customer.phone_no}`}
-                              className="hover:text-blue-600 dark:hover:text-blue-400"
-                            >
-                              {customer.phone_no}
-                            </a>
-                          </div>
-                          {customer.email && (
-                            <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                              <Mail className="w-3 h-3" />
-                              <a
-                                href={`mailto:${customer.email}`}
-                                className="hover:text-blue-600 dark:hover:text-blue-400"
-                              >
-                                {customer.email}
-                              </a>
-                            </div>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {customer.loyalty_number ? (
-                          <Badge variant="outline">{customer.loyalty_number}</Badge>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Badge variant="secondary">{customer.total_bookings || 0}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        {customer.last_booking_date ? (
-                          <div className="flex items-center gap-2">
-                            <CalendarIcon className="w-4 h-4 text-gray-400" />
-                            <span className="text-sm">{formatDate(customer.last_booking_date)}</span>
-                          </div>
-                        ) : (
-                          <span className="text-gray-400 text-sm">Never</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="outline" size="sm" asChild>
-                          <Link to={`/customers/${customer.id}/details`}>View</Link>
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
+             <TableBody>
+  {filteredCustomers.length === 0 ? (
+    <TableRow>
+      <TableCell colSpan={6} className="text-center py-8 text-gray-500">
+        {hasActiveFilters ? "No customers match your filters" : "No customers found"}
+      </TableCell>
+    </TableRow>
+  ) : (
+    filteredCustomers.map((customer) => (
+      <TableRow
+        key={customer.id}
+        onClick={() => navigate(`/customers/${customer.id}/details`)}
+        className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-900"
+      >
+        <TableCell>
+          {/* optional: keep it as text instead of Link, since row is clickable */}
+          <span className="font-medium hover:text-blue-600 dark:hover:text-blue-400">
+            {customer.name}
+          </span>
+        </TableCell>
+
+        <TableCell>
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-2 text-sm">
+              <Phone className="w-3 h-3 text-gray-400" />
+              <a
+                href={`tel:${customer.phone_no}`}
+                onClick={(e) => e.stopPropagation()}
+                className="hover:text-blue-600 dark:hover:text-blue-400"
+              >
+                {customer.phone_no}
+              </a>
+            </div>
+
+            {customer.email && (
+              <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                <Mail className="w-3 h-3" />
+                <a
+                  href={`mailto:${customer.email}`}
+                  onClick={(e) => e.stopPropagation()}
+                  className="hover:text-blue-600 dark:hover:text-blue-400"
+                >
+                  {customer.email}
+                </a>
+              </div>
+            )}
+          </div>
+        </TableCell>
+
+        <TableCell>
+          {customer.loyalty_number ? (
+            <Badge variant="outline">{customer.loyalty_number}</Badge>
+          ) : (
+            <span className="text-gray-400">-</span>
+          )}
+        </TableCell>
+
+        <TableCell className="text-center">
+          <Badge variant="secondary">{customer.total_bookings || 0}</Badge>
+        </TableCell>
+
+        <TableCell>
+          {customer.last_booking_date ? (
+            <div className="flex items-center gap-2">
+              <CalendarIcon className="w-4 h-4 text-gray-400" />
+              <span className="text-sm">{formatDate(customer.last_booking_date)}</span>
+            </div>
+          ) : (
+            <span className="text-gray-400 text-sm">Never</span>
+          )}
+        </TableCell>
+
+        {/* Removed View button cell */}
+      </TableRow>
+    ))
+  )}
+</TableBody>
+
             </Table>
           </div>
 

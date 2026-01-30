@@ -714,9 +714,10 @@ booking.status === 'completed' && !canBeCompleted ? 'confirmed' : booking.status
     >
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Button variant="outline" size="icon" onClick={() => navigate('/bookings')}>
+      <Button variant="outline" size="icon" onClick={() => navigate(-1)}>
           <ArrowLeft className="w-4 h-4" />
-        </Button>
+      </Button>
+
         <div className="flex-1">
           <h1 className="text-3xl font-bold">Booking Details</h1>
           <p className="text-gray-600 dark:text-gray-400 mt-1">

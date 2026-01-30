@@ -200,7 +200,7 @@ const handleSubmit = async (e: React.FormEvent) => {
            
           </motion.div>
 
-          {/* Demo Credentials */}
+          {/* Demo Credentials
           <motion.div
             className="mt-8 pt-6 border-t border-white/20 text-center text-sm"
             initial={{ opacity: 0 }}
@@ -212,7 +212,7 @@ const handleSubmit = async (e: React.FormEvent) => {
               <p className="font-mono">Phone: <span className="font-semibold text-cyan-300">0772222222</span></p>
               <p className="font-mono">Password: <span className="font-semibold text-cyan-300">admin123</span></p>
             </div>
-          </motion.div>
+          </motion.div> */}
         </div>
       </motion.div>
     </div>

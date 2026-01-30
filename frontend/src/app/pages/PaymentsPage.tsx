@@ -44,6 +44,7 @@ import { toast } from 'sonner';
 import { motion } from 'motion/react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { useNavigate } from 'react-router-dom';
 
 type Payment = {
   id: number;
@@ -102,6 +103,7 @@ export function PaymentsPage() {
   });
   const [paymentMethodFilter, setPaymentMethodFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const navigate = useNavigate();
 
   const fetchPayments = async (page: number = 1) => {
     setLoading(true);
@@ -541,64 +543,71 @@ const exportToPDF = () => {
                       <TableHead className="whitespace-nowrap">Reference</TableHead>
                       <TableHead className="whitespace-nowrap">Amount</TableHead>
                       <TableHead className="whitespace-nowrap">Note</TableHead>
-                      <TableHead className="whitespace-nowrap">Actions</TableHead>
+                      {/* <TableHead className="whitespace-nowrap">Actions</TableHead> */}
                     </TableRow>
                   </TableHeader>
-                  <TableBody>
-                    {filteredPayments.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
-                          No payments found
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      filteredPayments.map((payment) => (
-                        <TableRow key={payment.id}>
-                          <TableCell className="font-medium">#{payment.id}</TableCell>
-                          <TableCell className="whitespace-nowrap">
-                            {formatDateTime(payment.paid_at)}
-                          </TableCell>
-                          <TableCell>
-                            <div className="space-y-1">
-                              <div className="font-medium">{payment.customer_name}</div>
-                              <div className="text-sm text-muted-foreground">
-                                {payment.customer_phone}
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="space-y-1">
-                              <div className="font-medium">{payment.service_name}</div>
-                              <div className="text-xs text-muted-foreground">
-                                Booking #{payment.booking_id}
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className={getMethodColor(payment.method)}>
-                              {payment.method || 'N/A'}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="whitespace-nowrap">
-                            {payment.reference_no || '-'}
-                          </TableCell>
-                          <TableCell className="font-semibold whitespace-nowrap">
-                            {formatCurrency(payment.amount)}
-                          </TableCell>
-                          <TableCell className="max-w-xs truncate">
-                            {payment.note || '-'}
-                          </TableCell>
-                          <TableCell>
-                            <Link to={`/bookings/${payment.booking_id}`}>
-                              <Button variant="ghost" size="sm">
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                            </Link>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
+                 <TableBody>
+  {filteredPayments.length === 0 ? (
+    <TableRow>
+      <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+        No payments found
+      </TableCell>
+    </TableRow>
+  ) : (
+    filteredPayments.map((payment) => (
+      <TableRow
+        key={payment.id}
+        onClick={() => navigate(`/bookings/${payment.booking_id}`)}
+        className="cursor-pointer hover:bg-muted/50 transition"
+      >
+        <TableCell className="font-medium">#{payment.id}</TableCell>
+
+        <TableCell className="whitespace-nowrap">
+          {formatDateTime(payment.paid_at)}
+        </TableCell>
+
+        <TableCell>
+          <div className="space-y-1">
+            <div className="font-medium">{payment.customer_name}</div>
+            <div className="text-sm text-muted-foreground">
+              {payment.customer_phone}
+            </div>
+          </div>
+        </TableCell>
+
+        <TableCell>
+          <div className="space-y-1">
+            <div className="font-medium">{payment.service_name}</div>
+            <div className="text-xs text-muted-foreground">
+              Booking #{payment.booking_id}
+            </div>
+          </div>
+        </TableCell>
+
+        <TableCell>
+          <Badge variant="outline" className={getMethodColor(payment.method)}>
+            {payment.method || "N/A"}
+          </Badge>
+        </TableCell>
+
+        <TableCell className="whitespace-nowrap">
+          {payment.reference_no || "-"}
+        </TableCell>
+
+        <TableCell className="font-semibold whitespace-nowrap">
+          {formatCurrency(payment.amount)}
+        </TableCell>
+
+        <TableCell className="max-w-xs truncate">
+          {payment.note || "-"}
+        </TableCell>
+
+        {/* 👁 View button removed */}
+      </TableRow>
+    ))
+  )}
+</TableBody>
+
                 </Table>
               </div>
 

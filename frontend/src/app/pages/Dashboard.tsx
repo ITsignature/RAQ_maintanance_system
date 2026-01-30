@@ -8,6 +8,7 @@ import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { toast } from 'sonner';
 import { Loader } from '../components/Loader';
+import { useNavigate } from 'react-router-dom';
 
 
 type DashboardData = {
@@ -69,7 +70,7 @@ type DashboardData = {
 export function Dashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
-
+  const navigate = useNavigate();
   // Fetch dashboard data from the optimized backend endpoint
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -286,38 +287,40 @@ export function Dashboard() {
                   No bookings scheduled for today
                 </p>
               ) : (
-                <div className="space-y-3">
-                  {data.today.bookings.slice(0, 5).map((booking, index) => (
-                    <motion.div
-                      key={booking.id}
-                      className="p-3 border rounded-lg hover:bg-blue-50 dark:hover:bg-blue-950 hover:border-blue-200 dark:hover:border-blue-800 transition-all duration-200"
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: index * 0.1 }}
-                      whileHover={{ x: 4 }}
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <p className="font-medium">{booking.customer.name}</p>
-                          <p className="text-sm text-gray-600 dark:text-gray-400">
-                            {booking.service_name}
-                          </p>
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className="text-sm text-gray-500 dark:text-gray-400">
-                              {formatTime(booking.start_time)}
-                            </span>
-                            <Badge className={getStatusColor(booking.status)}>
-                              {booking.status}
-                            </Badge>
-                          </div>
-                        </div>
-                        <Button size="sm" variant="ghost" asChild>
-                          <Link to={`/bookings/${booking.id}`}>Details</Link>
-                        </Button>
+              <div className="space-y-3">
+              {data.today.bookings.slice(0, 5).map((booking, index) => (
+                <motion.div
+                  key={booking.id}
+                  onClick={() => navigate(`/bookings/${booking.id}`)}
+                  className="p-3 border rounded-lg cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-950 hover:border-blue-200 dark:hover:border-blue-800 transition-all duration-200"
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: index * 0.1 }}
+                  whileHover={{ x: 4 }}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <p className="font-medium">{booking.customer.name}</p>
+
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        {booking.service_name}
+                      </p>
+
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-sm text-gray-500 dark:text-gray-400">
+                          {formatTime(booking.start_time)}
+                        </span>
+
+                        <Badge className={getStatusColor(booking.status)}>
+                          {booking.status}
+                        </Badge>
                       </div>
-                    </motion.div>
-                  ))}
-                </div>
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+
               )}
             </CardContent>
           </Card>
@@ -342,42 +345,45 @@ export function Dashboard() {
                 </p>
               ) : (
                 <div className="space-y-3">
-                  {data.upcoming.bookings.slice(0, 5).map((booking, index) => (
-                    <motion.div
-                      key={booking.id}
-                      className="p-3 border rounded-lg hover:bg-green-50 dark:hover:bg-green-950 hover:border-green-200 dark:hover:border-green-800 transition-all duration-200"
-                      initial={{ opacity: 0, x: 20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: index * 0.1 }}
-                      whileHover={{ x: -4 }}
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <p className="font-medium">{booking.customer.name}</p>
-                          <p className="text-sm text-gray-600 dark:text-gray-400">
-                            {booking.service_name}
-                          </p>
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className="text-sm text-gray-500 dark:text-gray-400">
-                              {formatDate(booking.booking_date)}
-                            </span>
-                            <Badge className={getStatusColor(booking.payment_status)}>
-                              {booking.payment_status}
-                            </Badge>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-medium text-gray-900 dark:text-gray-100">
-                            {formatCurrency(booking.service_amount)}
-                          </p>
-                          <Button size="sm" variant="ghost" asChild>
-                            <Link to={`/bookings/${booking.id}`}>View</Link>
-                          </Button>
-                        </div>
-                      </div>
-                    </motion.div>
-                  ))}
-                </div>
+  {data.upcoming.bookings.slice(0, 5).map((booking, index) => (
+    <motion.div
+      key={booking.id}
+      onClick={() => navigate(`/bookings/${booking.id}`)}
+      className="p-3 border rounded-lg cursor-pointer hover:bg-green-50 dark:hover:bg-green-950 hover:border-green-200 dark:hover:border-green-800 transition-all duration-200"
+      initial={{ opacity: 0, x: 20 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ delay: index * 0.1 }}
+      whileHover={{ x: -4 }}
+    >
+      <div className="flex items-start justify-between">
+        <div className="flex-1">
+          <p className="font-medium">{booking.customer.name}</p>
+
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            {booking.service_name}
+          </p>
+
+          <div className="flex items-center gap-2 mt-1">
+            <span className="text-sm text-gray-500 dark:text-gray-400">
+              {formatDate(booking.booking_date)}
+            </span>
+
+            <Badge className={getStatusColor(booking.payment_status)}>
+              {booking.payment_status}
+            </Badge>
+          </div>
+        </div>
+
+        <div className="text-right">
+          <p className="font-medium text-gray-900 dark:text-gray-100">
+            {formatCurrency(booking.service_amount)}
+          </p>
+        </div>
+      </div>
+    </motion.div>
+  ))}
+</div>
+
               )}
             </CardContent>
           </Card>
