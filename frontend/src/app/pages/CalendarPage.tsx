@@ -303,9 +303,9 @@ export function CalendarPage() {
                           </Link>
                         );
                       })}
-                      {dayBookings.length > 3 && (
+                      {dayBookings.length > 8 && (
                         <div className="text-xs text-gray-600 dark:text-gray-400 text-center">
-                          +{dayBookings.length - 3} more
+                          +{dayBookings.length - 8} more
                         </div>
                       )}
                     </div>
