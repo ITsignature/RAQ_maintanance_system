@@ -7,7 +7,7 @@ const rateLimit = require("express-rate-limit");
 const path = require('path');  // Import path module at the top
 
 const app = express();
-
+//author
 // Serve static files from the 'uploads' directory
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
