@@ -16,9 +16,8 @@ jobs:
         host: ${{ secrets.VPS_HOST }}
         username: ${{ secrets.VPS_USER }}
         key: ${{ secrets.VPS_SSH_KEY }}
-        known_hosts: ${{ secrets.VPS_KNOWN_HOSTS }}
         script: |
-          cd /var/www/RAQ_maintanance_system
+          cd /www/wwwroot/maintenance.royalaquarium.lk
 
           git reset --hard HEAD
           git clean -fd
@@ -26,11 +25,12 @@ jobs:
 
           cd backend
           npm ci
-          pm2 restart booking_backend --update-env
+          pm2 restart maintenance.royalaquarium.lk --update-env
           pm2 save
 
           cd ../frontend
           npm ci
           npm run build
 
-          sudo systemctl reload nginx
+          #sudo systemctl reload nginx
+          /www/server/nginx/sbin/nginx -s reload
